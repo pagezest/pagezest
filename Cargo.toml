@@ -1,0 +1,10 @@
+[package]
+name = "pagezest"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chrono = "0.4.40"
+rusqlite = "0.34.0"
+thiserror = "2.0.12"
+tiny_http = "0.12.0"
