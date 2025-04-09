@@ -2,10 +2,10 @@
 // Create Post
 // Read Post
 // Read All Posts
-mod errors;
-mod server;
 mod db;
+mod errors;
 mod post;
+mod server;
 
 use post::BlogPost;
 use rusqlite::Connection;
@@ -17,9 +17,11 @@ fn main() -> Result<(), AppError> {
     let conn = Connection::open("pagezest.db")?;
     db::init_db(&conn)?;
 
-    // TODO : If no blogs are there then create one sample blog.
-    let blog_post = BlogPost::new("example", "PageZestExample Blog", "<h1> Example </h1>");
-    db::create_post(&conn, blog_post)?;
+    // If no blogs are there then create one sample blog.
+    if db::get_all_post(&conn)?.is_empty() {
+        let blog_post = BlogPost::new("example", "PageZestExample Blog", "<h1> Example </h1>");
+        db::create_post(&conn, blog_post)?;
+    }
 
     // Run a server.
     server::run_server(conn)

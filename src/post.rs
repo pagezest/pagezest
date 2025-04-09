@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct BlogPost {
     pub title: String,
     pub content: String,

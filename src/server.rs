@@ -1,8 +1,9 @@
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
-use tiny_http::{ Response, Server };
+use tiny_http::{Response, Server};
 
+use crate::db::get_post_by_slug;
 use crate::errors::AppError;
 
 pub fn run_server(conn: Connection) -> Result<(), AppError> {
@@ -30,10 +31,19 @@ fn route_request(path: &str, conn: &Arc<Mutex<Connection>>) -> Result<String, Ap
         return Ok("<h1>Pagezest Home</h1>".to_string());
     } else if let Some(slug) = path.strip_prefix("/blog/") {
         // This will handle /blog/abc-123
-        let post = "";
-        Ok(post.to_string())
+        let post = get_post_by_slug(&conn.lock().unwrap(), slug)?;
+        match post {
+            Some(post) => Ok(post.content),
+            None => Err(AppError::PageNotFound(format!(
+                "No Post Found for slug : {}",
+                slug
+            ))),
+        }
     } else {
         // 404
-        Err(AppError::PageNotFound(format!("The Page is not found on this site. {}", path)))
+        Err(AppError::PageNotFound(format!(
+            "Route Not Allowed {}",
+            path
+        )))
     }
 }
