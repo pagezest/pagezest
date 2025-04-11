@@ -5,12 +5,17 @@ use tiny_http::{ Response, Server };
 
 use crate::api::route_request;
 use crate::errors::AppError;
+use crate::memory::get_process_memory;
 
 pub fn run_server(conn: Connection) -> Result<(), AppError> {
+    println!("Starting Web Server");
+    let m1 = get_process_memory();
     let shared_conn = Arc::new(Mutex::new(conn));
     let server = Server::http("0.0.0.0:8080")?;
+    println!("Memory after starting server : {} KB", m1);
 
     for request in server.incoming_requests() {
+        let m2 = get_process_memory();
         let path = request.url().to_string();
         let method = request.method().clone(); // clone to extend lifetime
         let mut request = request; // shadowing as mutable after prior borrows
@@ -37,8 +42,10 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
                     )
             }
         };
-
+        let m3 = get_process_memory();
         let _ = request.respond(response);
+        println!("API Request Received. Memory : {} KB", m2);
+        println!("API Response Sent. Memory : {} KB", m3);
     }
 
     Ok(())

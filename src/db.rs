@@ -95,3 +95,11 @@ pub fn update_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
     conn.execute(update_post_query, params)?;
     Ok(())
 }
+
+pub fn delete_post(conn: &Connection, slug: &str) -> Result<()> {
+    let delete_post_query = r#"
+        DELETE FROM posts WHERE slug = ?
+    "#;
+    conn.execute(delete_post_query, [slug])?;
+    Ok(())
+}
