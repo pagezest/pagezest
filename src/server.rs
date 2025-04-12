@@ -14,8 +14,8 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
     let server = Server::http("0.0.0.0:8080")?;
     println!("Memory after starting server : {} KB", m1);
 
+    let mut prev_request_memory = get_process_memory();
     for request in server.incoming_requests() {
-        let m2 = get_process_memory();
         let path = request.url().to_string();
         let method = request.method().clone(); // clone to extend lifetime
         let mut request = request; // shadowing as mutable after prior borrows
@@ -42,10 +42,13 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
                     )
             }
         };
-        let m3 = get_process_memory();
+        let current_request_memory = get_process_memory();
         let _ = request.respond(response);
-        println!("API Request Received. Memory : {} KB", m2);
-        println!("API Response Sent. Memory : {} KB", m3);
+        let overhead = current_request_memory.saturating_sub(prev_request_memory);
+        if overhead > 0 {
+            println!("Memory Overhead per request : {} KB ", overhead);
+        }
+        prev_request_memory = current_request_memory;
     }
 
     Ok(())
