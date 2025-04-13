@@ -1,9 +1,10 @@
+use std::io::Cursor;
 use std::sync::{ Arc, Mutex };
 
 use rusqlite::Connection;
 use tiny_http::{ Response, Server };
 
-use crate::api::route_request;
+use crate::api::{ load_sample_image, route_request };
 use crate::errors::AppError;
 use crate::memory::get_process_memory;
 
@@ -20,28 +21,34 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
         let method = request.method().clone(); // clone to extend lifetime
         let mut request = request; // shadowing as mutable after prior borrows
 
-        let response = match route_request(&method, &path, &shared_conn, &mut request) {
-            Ok(body) => {
-                let body_str = serde_json
-                    ::to_string(&body)
-                    .unwrap_or_else(|_| "{\"error\": \"Internal Server Error\"}".to_string());
-                Response::from_string(body_str).with_header(
-                    tiny_http::Header
-                        ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                        .unwrap()
-                )
-            }
-            Err(e) => {
-                let error_msg = format!("{{\"error\": \"{}\"}}", e);
-                Response::from_string(error_msg)
-                    .with_status_code(500)
-                    .with_header(
+        let response: Response<Cursor<Vec<u8>>>;
+        if path == "/api/test-image" {
+            response = load_sample_image().unwrap();
+        } else {
+            response = match route_request(&method, &path, &shared_conn, &mut request) {
+                Ok(body) => {
+                    let body_str = serde_json
+                        ::to_string(&body)
+                        .unwrap_or_else(|_| "{\"error\": \"Internal Server Error\"}".to_string());
+                    Response::from_string(body_str).with_header(
                         tiny_http::Header
                             ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
                             .unwrap()
                     )
-            }
-        };
+                }
+                Err(e) => {
+                    let error_msg = format!("{{\"error\": \"{}\"}}", e);
+                    Response::from_string(error_msg)
+                        .with_status_code(500)
+                        .with_header(
+                            tiny_http::Header
+                                ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
+                                .unwrap()
+                        )
+                }
+            };
+        }
+
         let current_request_memory = get_process_memory();
         let _ = request.respond(response);
         let overhead = current_request_memory.saturating_sub(prev_request_memory);

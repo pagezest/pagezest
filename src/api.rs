@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use serde_json::{ Value, json };
-use std::sync::{ Arc, Mutex };
-use tiny_http::{ Method, Request };
+use std::{ io::Cursor, sync::{ Arc, Mutex } };
+use tiny_http::{ Header, Method, Request, Response };
 
 use crate::{ db, errors::AppError, post::BlogPost };
 
@@ -109,4 +109,11 @@ fn delete_blog_post(
         }
         Err(e) => { Ok(json!({"msg" : format!("Failed to Delete blog {}", e), "success" : false})) }
     }
+}
+
+pub fn load_sample_image() -> Result<Response<Cursor<Vec<u8>>>, AppError> {
+    let data = std::fs::read("sample.jpg")?;
+    let mut response = Response::from_data(data);
+    response.add_header(Header::from_bytes(&b"Content-Type"[..], &b"image/jpeg"[..]).unwrap());
+    Ok(response)
 }
