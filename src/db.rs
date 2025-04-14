@@ -32,7 +32,7 @@ pub fn create_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
 
 pub fn get_all_post(conn: &Connection) -> Result<Vec<BlogPost>> {
     let fetch_all_post_query = r#"
-        SELECT slug, title, content
+        SELECT slug, title, content, created_at
         FROM posts
     "#;
 
@@ -42,10 +42,12 @@ pub fn get_all_post(conn: &Connection) -> Result<Vec<BlogPost>> {
         let title: String = row.get(1)?;
         let content_str: String = row.get(2)?;
         let content_json: Value = serde_json::from_str(&content_str).unwrap();
+        let created_at: String = row.get(3)?;
         Ok(BlogPost {
             slug,
             title,
             content: content_json,
+            created_at,
         })
     })?;
 
@@ -59,7 +61,7 @@ pub fn get_all_post(conn: &Connection) -> Result<Vec<BlogPost>> {
 pub fn get_post_by_slug(conn: &Connection, slug: &str) -> Result<Option<BlogPost>> {
     let fetch_post_by_slug_query =
         r#"
-        SELECT slug, title, content
+        SELECT slug, title, content, created_at
         FROM posts WHERE slug = ?1
     "#;
     let mut stmt = conn.prepare(fetch_post_by_slug_query)?;
@@ -69,10 +71,12 @@ pub fn get_post_by_slug(conn: &Connection, slug: &str) -> Result<Option<BlogPost
         let title: String = row.get(1)?;
         let content_str: String = row.get(2)?;
         let content_json: Value = serde_json::from_str(&content_str).unwrap();
+        let created_at: String = row.get(3)?;
         Ok(BlogPost {
             slug,
             title,
             content: content_json,
+            created_at,
         })
     })?;
 
@@ -96,10 +100,10 @@ pub fn update_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
     Ok(())
 }
 
-pub fn delete_post(conn: &Connection, slug: &str) -> Result<()> {
+pub fn delete_post(conn: &Connection, id: &str) -> Result<()> {
     let delete_post_query = r#"
-        DELETE FROM posts WHERE slug = ?
+        DELETE FROM posts WHERE id = ?
     "#;
-    conn.execute(delete_post_query, [slug])?;
+    conn.execute(delete_post_query, [id])?;
     Ok(())
 }
