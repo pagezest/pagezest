@@ -3,7 +3,7 @@ use std::sync::{ Arc, Mutex };
 use rusqlite::Connection;
 use tiny_http::{ Response, Server };
 
-use crate::api::route_request;
+use crate::api::{route_request, ResponseType};
 use crate::errors::AppError;
 use crate::memory::get_process_memory;
 
@@ -21,7 +21,7 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
         let mut request = request; // shadowing as mutable after prior borrows
 
         let response = match route_request(&method, &path, &shared_conn, &mut request) {
-            Ok(body) => {
+            Ok(ResponseType::Json(body)) => {
                 let body_str = serde_json
                     ::to_string(&body)
                     .unwrap_or_else(|_| "{\"error\": \"Internal Server Error\"}".to_string());
@@ -30,6 +30,14 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
                         ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
                         .unwrap()
                 )
+            }
+            Ok(ResponseType::Html(body)) => {
+                Response::from_string(body).with_header(
+                    tiny_http::Header
+                        ::from_bytes(&b"Content-Type"[..], &b"text/html"[..])
+                        .unwrap()
+                )
+
             }
             Err(e) => {
                 let error_msg = format!("{{\"error\": \"{}\"}}", e);
