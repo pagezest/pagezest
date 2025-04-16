@@ -8,6 +8,7 @@ mod errors;
 mod post;
 mod server;
 mod memory;
+mod plugin;
 
 use rusqlite::Connection;
 use serde_json::json;

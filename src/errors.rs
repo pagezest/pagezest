@@ -13,6 +13,9 @@ pub enum AppError {
     #[error("Other error: {0}")]
     OtherError(#[from] Box<dyn std::error::Error + Send + Sync>),
 
+    #[error("Server error: {0}")]
+    ServerError(String),
+
     #[error("Page Not Found: {0}")]
     PageNotFound(String),
 }
