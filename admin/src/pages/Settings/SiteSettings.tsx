@@ -1,18 +1,15 @@
 import {
+  Container,
   TextInput,
   Select,
   Button,
-  Title,
   Stack,
-  Container,
+  Title,
+  Flex,
 } from "@mantine/core";
-
-export default function Settings() {
+export default function SiteSettings() {
   return (
-    <Container size="sm" pt="xl">
-      <Title order={2} mb="md">
-        Settings
-      </Title>
+    <Container size="md" pt="xl">
       <form>
         <Stack>
           <TextInput
@@ -32,7 +29,9 @@ export default function Settings() {
             data={["UTC", "PST", "EST", "CET"]}
             required
           />
-          <Button type="submit">Save Settings</Button>
+          <Flex justify="end" mt="md">
+            <Button type="submit">Save Settings</Button>
+          </Flex>
         </Stack>
       </form>
     </Container>
