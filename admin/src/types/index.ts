@@ -14,3 +14,15 @@ export interface User {
   email: string;
   role: 'admin' | 'editor' | 'viewer';
 }
+
+export interface Plugin {
+  id: string;
+  name: string;
+  version: string;
+  manifest: PluginManifest;
+}
+
+export interface PluginManifest {
+  name: string;
+  version: string;
+}
