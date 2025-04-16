@@ -22,6 +22,7 @@ export default function AppRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="posts" element={<Posts />} />
           <Route path="users" element={<Users />} />
+          <Route path="settings/:page" element={<Settings />} />
           <Route path="settings" element={<Settings />} />
           <Route path="posts/new" element={<PostForm />} />
           <Route path="posts/:id/edit" element={<PostForm />} />
