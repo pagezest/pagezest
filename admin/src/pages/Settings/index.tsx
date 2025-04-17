@@ -1,11 +1,12 @@
+import { useState } from "react";
+import { useParams } from "react-router-dom";
 import {
-  Box,
   Tabs,
 } from "@mantine/core";
+import { Palette, Puzzle, SettingsIcon } from "lucide-react";
 import SiteSettings from "./SiteSettings";
 import PluginsSettings from "./PluginsSettings";
-import { useParams } from "react-router-dom";
-import { useState } from "react";
+import ThemeSettings from "./ThemeSettings";
 
 export default function Settings() {
   const params = useParams();
@@ -14,18 +15,24 @@ export default function Settings() {
   return (
     <Tabs value={page} onChange={setPage}>
       <Tabs.List>
-        <Tabs.Tab value="site_settings">
+        <Tabs.Tab value="site_settings" leftSection={<SettingsIcon />}>
           Site Settings
         </Tabs.Tab>
-        <Tabs.Tab value="plugins">
+        <Tabs.Tab value="themes" leftSection={<Palette />}>
+          Themes
+        </Tabs.Tab>
+        <Tabs.Tab value="plugins" leftSection={<Puzzle />}>
           Plugins
         </Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="site_settings">
         <SiteSettings />
       </Tabs.Panel>
-      <Tabs.Panel value="plugins">
+      <Tabs.Panel value="themes">
         <PluginsSettings />
+      </Tabs.Panel>
+      <Tabs.Panel value="plugins">
+        <ThemeSettings />
       </Tabs.Panel>
     </Tabs>
   );
