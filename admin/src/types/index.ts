@@ -26,3 +26,29 @@ export interface PluginManifest {
   name: string;
   version: string;
 }
+
+export interface ThemeLayout {
+  sections: Record<string, Section>;
+  order: string[];
+}
+
+export interface Theme {
+  id: string;
+  name: string;
+  version: string;
+  layouts: ThemeLayout[];
+}
+
+export type SettingValue = boolean | string | number;
+
+export interface Section {
+  type: string;
+  blocks?: Record<string, Block>;
+  block_order?: string[];
+  settings?: Record<string, SettingValue>;
+}
+
+export interface Block {
+  type: string;
+  settings: Record<string, SettingValue>;
+}
