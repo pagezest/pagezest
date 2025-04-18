@@ -6,7 +6,6 @@ FROM base AS app
 WORKDIR /app
 
 COPY ./pagezest /app/pagezest
-COPY ./*.wasm /app/
-COPY ./*.json /app/
+COPY ./plugins/ /app/plugins
 
 CMD ["./pagezest"]
