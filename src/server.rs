@@ -1,10 +1,10 @@
 use std::io::Cursor;
-use std::sync::{ Arc, Mutex };
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
-use tiny_http::{ Response, Server };
+use tiny_http::{Response, Server};
 
-use crate::api::{ load_sample_image, route_request };
+use crate::api::{ResponseType, load_sample_image, route_request};
 use crate::errors::AppError;
 use crate::memory::get_process_memory;
 
@@ -26,24 +26,30 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
             response = load_sample_image().unwrap();
         } else {
             response = match route_request(&method, &path, &shared_conn, &mut request) {
-                Ok(body) => {
-                    let body_str = serde_json
-                        ::to_string(&body)
+                Ok(ResponseType::Json(body)) => {
+                    let body_str = serde_json::to_string(&body)
                         .unwrap_or_else(|_| "{\"error\": \"Internal Server Error\"}".to_string());
                     Response::from_string(body_str).with_header(
-                        tiny_http::Header
-                            ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                            .unwrap()
+                        tiny_http::Header::from_bytes(
+                            &b"Content-Type"[..],
+                            &b"application/json"[..],
+                        )
+                        .unwrap(),
                     )
                 }
+                Ok(ResponseType::Html(body)) => Response::from_string(body).with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
+                ),
                 Err(e) => {
                     let error_msg = format!("{{\"error\": \"{}\"}}", e);
                     Response::from_string(error_msg)
                         .with_status_code(500)
                         .with_header(
-                            tiny_http::Header
-                                ::from_bytes(&b"Content-Type"[..], &b"application/json"[..])
-                                .unwrap()
+                            tiny_http::Header::from_bytes(
+                                &b"Content-Type"[..],
+                                &b"application/json"[..],
+                            )
+                            .unwrap(),
                         )
                 }
             };

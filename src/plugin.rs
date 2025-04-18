@@ -1,10 +1,10 @@
-use wasmi::{ Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc };
 use std::error::Error;
+use wasmi::{Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc};
 
 pub fn call_wasm(
     wasm_file_path: &str,
     input: &str,
-    plugin_func: &str
+    plugin_func: &str,
 ) -> Result<String, Box<dyn Error>> {
     let wasm = std::fs::read(wasm_file_path)?;
     let engine = Engine::new(&Config::default());
@@ -23,20 +23,25 @@ pub fn call_wasm(
         .unwrap();
 
     // Loading greet function and passing input as string and receiving output as string.
-    let plugin_func: TypedFunc<(u32, u32), u32> = instance
-        .get_typed_func(&store, plugin_func)
-        .unwrap();
+    let plugin_func: TypedFunc<(u32, u32), u32> =
+        instance.get_typed_func(&store, plugin_func).unwrap();
 
     let input_buffer = input.as_bytes();
     let offset = 0u32;
-    memory.write(&mut store, offset as usize, input_buffer).unwrap();
+    memory
+        .write(&mut store, offset as usize, input_buffer)
+        .unwrap();
 
-    let res_ptr = plugin_func.call(&mut store, (offset, input.len() as u32)).unwrap();
+    let res_ptr = plugin_func
+        .call(&mut store, (offset, input.len() as u32))
+        .unwrap();
     let mut output = Vec::new();
     let mut curr_ptr = res_ptr;
     loop {
         let mut buf = [0u8, 1];
-        memory.read(&mut store, curr_ptr as usize, &mut buf).unwrap();
+        memory
+            .read(&mut store, curr_ptr as usize, &mut buf)
+            .unwrap();
         if buf[0] == 0 {
             break;
         }

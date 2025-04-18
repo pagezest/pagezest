@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -6,6 +7,8 @@ pub struct BlogPost {
     pub title: String,
     pub content: Value,
     pub slug: String,
+    pub created_at: String,
+    pub updated_at: String,
 }
 
 impl BlogPost {
@@ -14,6 +17,8 @@ impl BlogPost {
             title: title.to_string(),
             content: content,
             slug: slug.to_string(),
+            created_at: Utc::now().to_string(),
+            updated_at: Utc::now().to_string(),
         }
     }
 }

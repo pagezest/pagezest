@@ -39,6 +39,7 @@ export const createPost = async (post: Omit<Post, 'id' | 'created_at' | 'updated
 
 export const updatePost = async (id: string, post: Partial<Post>): Promise<Post> => {
   const newPost: Partial<Post> = {
+    id: id,
     ...post,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -54,8 +55,7 @@ export const updatePost = async (id: string, post: Partial<Post>): Promise<Post>
 };
 
 export const deletePost = async (id: string): Promise<void> => {
-  return fetch(`/api/delete`, {
-    method: 'POST',
-    body: `id=${id}`,
+  return fetch(`/api/blog/delete/${id}`, {
+    method: 'DELETE',
   }).then(a => a.text());
 };

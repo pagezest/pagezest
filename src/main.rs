@@ -5,17 +5,17 @@
 mod api;
 mod db;
 mod errors;
-mod post;
-mod server;
 mod memory;
 mod plugin;
+mod post;
+mod server;
 
 use rusqlite::Connection;
 use serde_json::json;
 
-use crate::post::BlogPost;
-use crate::memory::get_process_memory;
 use crate::errors::AppError;
+use crate::memory::get_process_memory;
+use crate::post::BlogPost;
 
 fn main() -> Result<(), AppError> {
     let m1 = get_process_memory();
@@ -28,7 +28,7 @@ fn main() -> Result<(), AppError> {
         let blog_post = BlogPost::new(
             "example",
             "PageZestExample Blog",
-            json!({"title" : "Pagezest"})
+            json!({"title" : "Pagezest"}),
         );
         db::create_post(&conn, blog_post).unwrap();
     }
