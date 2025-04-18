@@ -7,5 +7,6 @@ WORKDIR /app
 
 COPY ./pagezest /app/pagezest
 COPY ./plugins/ /app/plugins
+COPY ./admin/ /app/admin
 
 CMD ["./pagezest"]
