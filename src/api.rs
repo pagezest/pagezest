@@ -1,13 +1,14 @@
 use rusqlite::Connection;
 use serde_json::{ Value, json };
-use std::{ io::Cursor, sync::{ Arc, Mutex } };
+use std::{ fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
 use tiny_http::{ Header, Method, Request, Response };
 
-use crate::{ db, errors::AppError, plugin::call_wasm, post::BlogPost };
+use crate::{ db, errors::AppError, mime::get_mime_type, plugin::call_wasm, post::BlogPost };
 
 pub enum ResponseType {
     Json(Value),
     Html(String),
+    Binary(Vec<u8>, String), // data, mimeType
 }
 
 pub fn route_request(
@@ -24,7 +25,7 @@ pub fn route_request(
         (&Method::Post, "/api/blog/update") => update_blog_post(conn, request),
         (&Method::Post, "/api/plugin/demo") => get_table_of_contents(request),
         (&Method::Delete, p) if p.starts_with("/api/blog/delete/") => delete_blog_post(conn, p),
-        _ => Err(AppError::PageNotFound(path.to_string())),
+        _ => serve_static(request),
     }
 }
 
@@ -179,4 +180,25 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
         .collect();
 
     Ok(ResponseType::Json(json!({"data": toc, "success": true})))
+}
+
+fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
+    let static_serve_path = "admin/";
+    let path = request.url().trim_start_matches("/admin");
+    let file_path = Path::new(static_serve_path).join(path);
+    let file_path = if file_path.is_dir() {
+        file_path.join("index.html")
+    } else if file_path.is_dir() {
+        file_path
+    } else {
+        file_path
+    };
+    let file_exists = file_path.exists();
+    let file_extension = file_path.extension().map_or("html", |_ext| "html");
+    let mime = get_mime_type(file_extension);
+    if file_exists {
+        let content = fs::read(&file_path).unwrap();
+        return Ok(ResponseType::Binary(content, mime.to_string()))
+    }
+    Err(AppError::PageNotFound(file_path.to_str().unwrap().to_string()))
 }
