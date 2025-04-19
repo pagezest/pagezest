@@ -61,10 +61,12 @@ export function Layout() {
       default:
         icon = <span>{node.value}</span>
     }
+    const isMatch = location.pathname.startsWith(node.nodeProps.path);
     return (
-      <Group {...elementProps} gap={7} mb="md" c={true ? 'blue': ''}>
+      <Group {...elementProps} gap={7} mb="md"
+        c={isMatch ? 'blue': ''}>
         {icon}
-        <span>{node.label}</span>
+        <Link to={node.nodeProps.path}>{node.label}</Link>
       </Group>
     );
   };
