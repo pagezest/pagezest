@@ -19,8 +19,7 @@ export default function PluginsSettings() {
   async function fetchPlugins() {
     try {
       const plugins = await getPlugins();
-      setPlugins(plugins);
-      console.log(plugins);
+      setPlugins(plugins.map(a => a));
     } catch(e) {
       setError(e as Error);      
       console.warn(e);

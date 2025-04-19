@@ -18,8 +18,7 @@ export default function ThemeSettings() {
   async function fetchThemes() {
     try {
       const themes = await getThemes();
-      setThemes(themes || []);
-      console.log(themes);
+      setThemes(themes.map(a => a));
     } catch(e) {
       setError(e as Error);      
       console.warn(e);
