@@ -37,9 +37,41 @@ fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTyp
     let id = p.strip_prefix("/api/blog/").unwrap();
     let post = db::get_post(&conn.lock().unwrap(), id, false)?;
     match post {
-        Some(post) => Ok(ResponseType::Json(json!({"data" : post, "sucess": true}))),
+        // We will need a JSON for post.content to be passed and need to also edit plugin code accordingly.
+        // For now just hardcoding the markdown string.
+        Some(post) =>
+            render_page(
+                "plugins/page.json",
+                "#This is heading1\nContents of Line1\n##    This is Heading2\n  Contents of Line2"
+            ),
         None => Err(AppError::PageNotFound(format!("No post found for id: {}", id))),
     }
+}
+
+fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> {
+    let manifest = std::fs::read(manifest).unwrap();
+    let manifest_json: Value = serde_json
+        ::from_slice(&manifest)
+        .map_err(|e| AppError::ServerError(format!("Failed to parse manifest JSON: {}", e)))?;
+
+    let order = manifest_json
+        .get("order")
+        .and_then(|o| o.as_array())
+        .ok_or_else(||
+            AppError::ServerError("Missing or invalid 'order' field in manifest".to_string())
+        )?
+        .iter()
+        .filter_map(|v| v.as_str().map(String::from))
+        .collect::<Vec<String>>();
+
+    let mut page_contents = String::new();
+    for val in order {
+        if val == "toc" {
+            let toc_html = call_wasm("plugins/toc.wasm", content, "toc").unwrap();
+            page_contents.push_str(&format!("{}\n", toc_html));
+        }
+    }
+    Ok(ResponseType::Html(page_contents))
 }
 
 fn get_all_blog_posts(conn: &Arc<Mutex<Connection>>) -> Result<ResponseType, AppError> {
