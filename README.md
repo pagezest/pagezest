@@ -45,3 +45,12 @@ chmod +x load.sh
 ### Step-4 : Observe the logs on your Web-Server
 
 In your first terminal window where you had ran pagezest binary in Step-1.
+
+
+### Step-5 : Start UI dev server
+```
+cd admin
+npm run dev
+```
+
+This will start the UI dev server on port 5173 [http://localhost:5173](http://localhost:5173)
