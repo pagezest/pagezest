@@ -9,6 +9,7 @@ mod memory;
 mod plugin;
 mod post;
 mod server;
+mod mime;
 
 use rusqlite::Connection;
 use serde_json::json;

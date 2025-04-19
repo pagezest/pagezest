@@ -40,6 +40,9 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
                 Ok(ResponseType::Html(body)) => Response::from_string(body).with_header(
                     tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html"[..]).unwrap(),
                 ),
+                Ok(ResponseType::Binary(body, mime)) => Response::from_data(body).with_header(
+                    tiny_http::Header::from_bytes(&b"Content-Type"[..], &mime[..]).unwrap(),
+                ),
                 Err(e) => {
                     let error_msg = format!("{{\"error\": \"{}\"}}", e);
                     Response::from_string(error_msg)
