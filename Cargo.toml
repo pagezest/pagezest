@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 chrono = "0.4.40"
+phf = { version = "0.11.3", features = ["macros"] }
 psutil = "3.0.0"
 rusqlite = "0.34.0"
 serde = { version = "1.0", features = ["derive"] }
