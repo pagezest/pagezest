@@ -165,21 +165,8 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
             AppError::ServerError("Missing or invalid 'content' field in request body".to_string())
         })?;
 
-    let toc_raw = call_wasm("plugins/toc.wasm", md_content, "toc").unwrap();
-    let toc_lines: Vec<&str> = toc_raw.split('\n').collect();
-    let toc: Vec<Value> = toc_lines
-        .into_iter()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            let level = line
-                .chars()
-                .take_while(|&c| c == '\t')
-                .count();
-            json!({"level": level+1, "heading": line.trim()})
-        })
-        .collect();
-
-    Ok(ResponseType::Json(json!({"data": toc, "success": true})))
+    let toc_html = call_wasm("plugins/toc.wasm", md_content, "toc").unwrap();
+    Ok(ResponseType::Html(toc_html))
 }
 
 fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
@@ -198,7 +185,7 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
     let mime = get_mime_type(file_extension);
     if file_exists {
         let content = fs::read(&file_path).unwrap();
-        return Ok(ResponseType::Binary(content, mime.to_string()))
+        return Ok(ResponseType::Binary(content, mime.to_string()));
     }
     Err(AppError::PageNotFound(file_path.to_str().unwrap().to_string()))
 }

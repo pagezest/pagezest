@@ -14,12 +14,10 @@ export function toc(ptr: usize, len: i32): usize {
         while(heading_level < line.length && line[heading_level] == '#')
             heading_level++;
 
+        if (heading_level>6) continue;
+        
         const title = line.substring(heading_level).trim()
-        let indent = "";
-        for(let j=1; j<heading_level; j++){
-            indent += "\t";
-        }
-        tocLines.push(`${indent}${title}`);
+        tocLines.push(`<h${heading_level}>${title}</h${heading_level}>`);
     }
 
     const toc_str = String.UTF8.encode(tocLines.join("\n"), true);

@@ -13,7 +13,7 @@ Write your core plugin code in assemblyscript (typescript .ts) file for example 
 ## Step-3 : Compile the plugin with assemblyscript
 
 ```
-npx asm toc.ts --target release --exportRuntime --exportTable --outFile toc.wasm
+npx asc toc.ts --target release --exportRuntime --exportTable --outFile toc.wasm
 ```
 
 Load and test your .wasm file.
