@@ -30,7 +30,8 @@ pub fn route_request(
         (&Method::Post, "/api/blog/update") => update_blog_post(conn, request),
         (&Method::Post, "/api/plugin/demo") => get_table_of_contents(request),
         (&Method::Delete, p) if p.starts_with("/api/blog/delete/") => delete_blog_post(conn, p),
-        _ => serve_static(request),
+        (_, p) if p.starts_with("/pz-admin") => serve_static(request),
+        _ => Err(AppError::PageNotFound("".to_string())),
     }
 }
 
@@ -196,10 +197,10 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
 }
 
 fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
-    let static_serve_path = "admin/";
-    let path = request.url().trim_start_matches("/pz-admin");
+    let static_serve_path = "pz-admin/";
+    let path = request.url().trim_start_matches("/pz-admin").trim_start_matches('/');
     let file_path = Path::new(static_serve_path).join(path);
-    let file_path = if file_path.is_dir() {
+    let mut file_path = if file_path.is_dir() {
         file_path.join("index.html")
     } else if file_path.is_dir() {
         file_path
@@ -207,13 +208,10 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
         file_path
     };
     let file_exists = file_path.exists();
-    let file_extension = file_path.extension().map_or("html", |_ext| "html");
-    let mime = get_mime_type(file_extension);
-    if file_exists {
-        let content = fs::read(&file_path).unwrap();
-        return Ok(ResponseType::Binary(content, mime.to_string()));
+    if !file_exists {
+        file_path = Path::new(static_serve_path).join("index.html");
     }
-    Err(AppError::PageNotFound(
-        file_path.to_str().unwrap().to_string(),
-    ))
+    let file_extension = file_path.extension().and_then(|ext| ext.to_str()).unwrap_or("txt");
+    let content = fs::read(&file_path).unwrap();
+    Ok(ResponseType::Binary(content, get_mime_type(file_extension).to_string()))
 }
