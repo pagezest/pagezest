@@ -6,10 +6,10 @@ mod api;
 mod db;
 mod errors;
 mod memory;
+mod mime;
 mod plugin;
 mod post;
 mod server;
-mod mime;
 
 use rusqlite::Connection;
 use serde_json::json;
@@ -29,7 +29,7 @@ fn main() -> Result<(), AppError> {
         let blog_post = BlogPost::new(
             "example",
             "PageZestExample Blog",
-            json!({"title" : "Pagezest"}),
+            json!({"md" : "#This is heading1\nContents of Line1\n##    This is Heading2\n  Contents of Line2"}),
         );
         db::create_post(&conn, blog_post).unwrap();
     }

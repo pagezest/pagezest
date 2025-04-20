@@ -1,10 +1,9 @@
-use crate::{ api::ResponseType, post::BlogPost };
-use rusqlite::{ Connection, Result };
-use serde_json::{ Value, json };
+use crate::post::BlogPost;
+use rusqlite::{Connection, Result};
+use serde_json::{Value, json};
 
 pub fn init_db(conn: &Connection) -> Result<()> {
-    let table_creation =
-        r#"
+    let table_creation = r#"
     CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -19,8 +18,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 }
 
 pub fn create_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
-    let create_post_query =
-        r#"
+    let create_post_query = r#"
         INSERT INTO posts(slug, title, content)
         VALUES (?, ?, ?)
         ON CONFLICT(slug) DO NOTHING
@@ -32,8 +30,7 @@ pub fn create_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
 }
 
 pub fn get_all_post(conn: &Connection) -> Result<Vec<Value>> {
-    let fetch_all_post_query =
-        r#"
+    let fetch_all_post_query = r#"
         SELECT id, slug, title, created_at, updated_at
         FROM posts
     "#;
@@ -45,15 +42,13 @@ pub fn get_all_post(conn: &Connection) -> Result<Vec<Value>> {
         let title: String = row.get(2)?;
         let created_at: String = row.get(3)?;
         let updated_at: String = row.get(4)?;
-        Ok(
-            json!({
+        Ok(json!({
             "id": id,
             "slug": slug,
             "title": title,
             "created_at": created_at,
             "updated_at": updated_at
-        })
-        )
+        }))
     })?;
 
     let mut posts = Vec::new();
@@ -105,7 +100,7 @@ pub fn update_post(
     conn: &Connection,
     blog_post: BlogPost,
     identifier: &str,
-    by_slug: bool
+    by_slug: bool,
 ) -> Result<()> {
     let update_post_query = if by_slug {
         r#"
@@ -123,7 +118,12 @@ pub fn update_post(
 
     let content_str = blog_post.content.to_string();
     let params: Vec<&dyn rusqlite::ToSql> = if by_slug {
-        vec![&blog_post.title, &content_str, &blog_post.slug, &blog_post.slug]
+        vec![
+            &blog_post.title,
+            &content_str,
+            &blog_post.slug,
+            &blog_post.slug,
+        ]
     } else {
         vec![&blog_post.title, &content_str, &blog_post.slug, &identifier]
     };

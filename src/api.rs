@@ -1,9 +1,14 @@
 use rusqlite::Connection;
-use serde_json::{ Value, json };
-use std::{ fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
-use tiny_http::{ Header, Method, Request, Response };
+use serde_json::{Value, json};
+use std::{
+    fs,
+    io::Cursor,
+    path::Path,
+    sync::{Arc, Mutex},
+};
+use tiny_http::{Header, Method, Request, Response};
 
-use crate::{ db, errors::AppError, mime::get_mime_type, plugin::call_wasm, post::BlogPost };
+use crate::{db, errors::AppError, mime::get_mime_type, plugin::call_wasm, post::BlogPost};
 
 pub enum ResponseType {
     Json(Value),
@@ -15,7 +20,7 @@ pub fn route_request(
     method: &Method,
     path: &str,
     conn: &Arc<Mutex<Connection>>,
-    request: &mut Request
+    request: &mut Request,
 ) -> Result<ResponseType, AppError> {
     match (method, path) {
         (&Method::Get, "/") => health_check(),
@@ -30,36 +35,41 @@ pub fn route_request(
 }
 
 fn health_check() -> Result<ResponseType, AppError> {
-    Ok(ResponseType::Json(json!({"msg": "Server is healthy", "success": true})))
+    Ok(ResponseType::Json(
+        json!({"msg": "Server is healthy", "success": true}),
+    ))
 }
 
 fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseType, AppError> {
     let id = p.strip_prefix("/api/blog/").unwrap();
     let post = db::get_post(&conn.lock().unwrap(), id, false)?;
     match post {
-        // We will need a JSON for post.content to be passed and need to also edit plugin code accordingly.
-        // For now just hardcoding the markdown string.
-        Some(post) =>
-            render_page(
-                "plugins/page.json",
-                "#This is heading1\nContents of Line1\n##    This is Heading2\n  Contents of Line2"
-            ),
-        None => Err(AppError::PageNotFound(format!("No post found for id: {}", id))),
+        Some(post) => {
+            let md_str = post.content; // Assuming `post.content` contains the markdown string
+            let md_json: Value = md_str;
+            let md_content = md_json.get("md").and_then(|v| v.as_str()).ok_or_else(|| {
+                AppError::ServerError("Missing or invalid 'md' field in JSON".to_string())
+            })?;
+            render_page("plugins/page.json", md_content)
+        }
+        None => Err(AppError::PageNotFound(format!(
+            "No post found for id: {}",
+            id
+        ))),
     }
 }
 
 fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> {
     let manifest = std::fs::read(manifest).unwrap();
-    let manifest_json: Value = serde_json
-        ::from_slice(&manifest)
+    let manifest_json: Value = serde_json::from_slice(&manifest)
         .map_err(|e| AppError::ServerError(format!("Failed to parse manifest JSON: {}", e)))?;
 
     let order = manifest_json
         .get("order")
         .and_then(|o| o.as_array())
-        .ok_or_else(||
+        .ok_or_else(|| {
             AppError::ServerError("Missing or invalid 'order' field in manifest".to_string())
-        )?
+        })?
         .iter()
         .filter_map(|v| v.as_str().map(String::from))
         .collect::<Vec<String>>();
@@ -81,7 +91,7 @@ fn get_all_blog_posts(conn: &Arc<Mutex<Connection>>) -> Result<ResponseType, App
 
 fn create_new_blog_post(
     conn: &Arc<Mutex<Connection>>,
-    request: &mut Request
+    request: &mut Request,
 ) -> Result<ResponseType, AppError> {
     let mut req_body = String::new();
     request.as_reader().read_to_string(&mut req_body).unwrap();
@@ -92,39 +102,31 @@ fn create_new_blog_post(
         Ok(blog) => {
             // Check if Blog with given slug already exists or not.
             if db::get_post(&conn.lock().unwrap(), &blog.slug, true)?.is_some() {
-                return Ok(
-                    ResponseType::Json(
-                        json!({"msg": format!("Blog with slug {} already exists.", blog.slug), "success": false})
-                    )
-                );
+                return Ok(ResponseType::Json(
+                    json!({"msg": format!("Blog with slug {} already exists.", blog.slug), "success": false}),
+                ));
             }
             db::create_post(&conn.lock().unwrap(), blog)?;
-            Ok(
-                ResponseType::Json(
-                    json!({"msg" : "New Blog Created Successfully", "success": true})
-                )
-            )
+            Ok(ResponseType::Json(
+                json!({"msg" : "New Blog Created Successfully", "success": true}),
+            ))
         }
-        Err(e) =>
-            Ok(
-                ResponseType::Json(
-                    json!({"msg" : format!("Failed to Create blog {}", e), "success" : false})
-                )
-            ),
+        Err(e) => Ok(ResponseType::Json(
+            json!({"msg" : format!("Failed to Create blog {}", e), "success" : false}),
+        )),
     }
 }
 
 fn update_blog_post(
     conn: &Arc<Mutex<Connection>>,
-    request: &mut Request
+    request: &mut Request,
 ) -> Result<ResponseType, AppError> {
     let mut req_body = String::new();
     request.as_reader().read_to_string(&mut req_body).unwrap();
 
     // Parse the request body as JSON.
-    let req_json: Value = serde_json
-        ::from_str(&req_body)
-        .map_err(|e| { AppError::ServerError(format!("Failed to parse request body: {}", e)) })?;
+    let req_json: Value = serde_json::from_str(&req_body)
+        .map_err(|e| AppError::ServerError(format!("Failed to parse request body: {}", e)))?;
 
     // Extract the `id` field from the JSON.
     let id = req_json
@@ -139,24 +141,17 @@ fn update_blog_post(
             // Check if a blog with the given ID exists.
             if db::get_post(&conn.lock().unwrap(), id, false)?.is_some() {
                 db::update_post(&conn.lock().unwrap(), blog, id, false).unwrap();
-                return Ok(
-                    ResponseType::Json(
-                        json!({"msg" : "Updated your Blog Successfully", "success" : true})
-                    )
-                );
+                return Ok(ResponseType::Json(
+                    json!({"msg" : "Updated your Blog Successfully", "success" : true}),
+                ));
             }
-            Ok(
-                ResponseType::Json(
-                    json!({"msg": format!("No blog found with id - {}", id), "success" : false})
-                )
-            )
+            Ok(ResponseType::Json(
+                json!({"msg": format!("No blog found with id - {}", id), "success" : false}),
+            ))
         }
-        Err(e) =>
-            Ok(
-                ResponseType::Json(
-                    json!({"msg" : format!("Failed to Update blog {}", e), "success" : false})
-                )
-            ),
+        Err(e) => Ok(ResponseType::Json(
+            json!({"msg" : format!("Failed to Update blog {}", e), "success" : false}),
+        )),
     }
 }
 
@@ -166,14 +161,14 @@ fn delete_blog_post(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTy
     // Check if a blog with the given ID exists.
     if db::get_post(&conn.lock().unwrap(), id, false)?.is_some() {
         db::delete_post(&conn.lock().unwrap(), id, false)?;
-        return Ok(ResponseType::Json(json!({"msg": "Blog deleted successfully", "success": true})));
+        return Ok(ResponseType::Json(
+            json!({"msg": "Blog deleted successfully", "success": true}),
+        ));
     }
 
-    Ok(
-        ResponseType::Json(
-            json!({"msg": format!("No blog found with id - {}", id), "success": false})
-        )
-    )
+    Ok(ResponseType::Json(
+        json!({"msg": format!("No blog found with id - {}", id), "success": false}),
+    ))
 }
 
 pub fn load_sample_image() -> Result<Response<Cursor<Vec<u8>>>, AppError> {
@@ -187,9 +182,8 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
     let mut req_body = String::new();
     request.as_reader().read_to_string(&mut req_body).unwrap();
 
-    let req_json: Value = serde_json
-        ::from_str(&req_body)
-        .map_err(|e| AppError::ServerError(e.to_string()))?;
+    let req_json: Value =
+        serde_json::from_str(&req_body).map_err(|e| AppError::ServerError(e.to_string()))?;
     let md_content = req_json
         .get("content")
         .and_then(|c| c.as_str())
@@ -219,5 +213,7 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
         let content = fs::read(&file_path).unwrap();
         return Ok(ResponseType::Binary(content, mime.to_string()));
     }
-    Err(AppError::PageNotFound(file_path.to_str().unwrap().to_string()))
+    Err(AppError::PageNotFound(
+        file_path.to_str().unwrap().to_string(),
+    ))
 }

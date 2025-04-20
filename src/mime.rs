@@ -14,5 +14,8 @@ pub static EXTENSION_MIME_MAP: phf::Map<&'static str, &'static str> = phf_map! {
 };
 
 pub fn get_mime_type(extension: &str) -> &'static str {
-    EXTENSION_MIME_MAP.get(extension).copied().unwrap_or("application/octet-stream")
+    EXTENSION_MIME_MAP
+        .get(extension)
+        .copied()
+        .unwrap_or("application/octet-stream")
 }
