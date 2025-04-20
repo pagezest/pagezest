@@ -203,7 +203,7 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
 
 fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
     let static_serve_path = "admin/";
-    let path = request.url().trim_start_matches("/admin");
+    let path = request.url().trim_start_matches("/pz-admin");
     let file_path = Path::new(static_serve_path).join(path);
     let file_path = if file_path.is_dir() {
         file_path.join("index.html")
