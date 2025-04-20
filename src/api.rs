@@ -77,7 +77,7 @@ fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> 
     let mut page_contents = String::new();
     for val in order {
         if val == "toc" {
-            let toc_html = call_wasm("plugins/toc.wasm", content, "toc").unwrap();
+            let toc_html = call_wasm("plugins/page.wasm", content, "toc").unwrap();
             page_contents.push_str(&format!("{}\n", toc_html));
         }
     }

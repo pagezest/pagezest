@@ -28,7 +28,7 @@ fn main() -> Result<(), AppError> {
     if db::get_all_post(&conn)?.is_empty() {
         let blog_post = BlogPost::new(
             "example",
-            "PageZestExample Blog",
+            "PageZest Example Blog",
             json!({"md" : "#This is heading1\nContents of Line1\n##    This is Heading2\n  Contents of Line2"}),
         );
         db::create_post(&conn, blog_post).unwrap();

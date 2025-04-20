@@ -1,5 +1,9 @@
 {
-    "version": 1,
-    "name": "page",
-    "order" : ["header", "title", "toc", "content", "footer"]
+  "version": 1,
+  "name": "page",
+  "components": [
+    { "title": { "inputs": ["title"] } },
+    { "toc": { "inputs": ["content"] } }
+  ],
+  "order": ["title", "toc"]
 }

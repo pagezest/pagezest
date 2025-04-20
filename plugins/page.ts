@@ -1,3 +1,10 @@
+export function title(ptr: usize, len: i32): usize {
+    const title = String.UTF8.decodeUnsafe(ptr, len, true);
+    const html = `<h1>${title}</h1><hr>`;
+    const html_str = String.UTF8.encode(html, true);
+    return changetype<usize>(html_str);
+}
+
 export function toc(ptr: usize, len: i32): usize {
     // Converting the raw string.
     const md = String.UTF8.decodeUnsafe(ptr, len, true);
