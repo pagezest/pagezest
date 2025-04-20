@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Route, Navigate, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { PrivateRoute } from '@/components/PrivateRoute';
 import { Dashboard } from '@/pages/Dashboard';
@@ -8,9 +8,11 @@ import { Login } from '@/pages/Login';
 import { Users } from '@/pages/Users';
 import Settings from '@/pages/Settings';
 
+const APP_BASENAME: string = import.meta.env.VITE_ROUTER_BASE_NAME || '/pz-admin';
+
 export default function AppRoutes() {
   return (
-    <Router>
+    <Router basename={APP_BASENAME}>
       <Routes>
         <Route path="/login" element={<Login />} />
 

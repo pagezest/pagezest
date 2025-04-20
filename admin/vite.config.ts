@@ -13,29 +13,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  base: process.env.VITE_BASE_URL || './',
   server: {
-    /*
-    proxy: {
-      '/': {
-        target: 'http://127.0.0.1:8080',
-        changeOrigin: true,
-      },
-    },
-    middlewareMode: true,
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        // Check if the request URL starts with the prefix /local-api
-        if (req.url?.startsWith('/local-api')) {
-          // Remove the /local-api prefix
-          req.url = req.url.replace(/^\/local-api/, '');
-          // Continue with local handling (no proxy)
-          return next();
-        }
-        // Otherwise, proceed with proxying the request
-        next();
-      });
-    },
-    */
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8080',

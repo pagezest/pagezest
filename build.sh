@@ -8,8 +8,8 @@ pushd admin
 npm run build
 popd
 
-rm -rf docker/admin/
-cp -r admin/dist/ docker/admin/
+rm -rf docker/pz-admin/
+cp -r admin/dist/ docker/pz-admin/
 
 cp plugins/*.wasm docker/plugins/
 cp plugins/*.json docker/plugins/
