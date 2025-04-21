@@ -23,14 +23,14 @@ pub fn route_request(
     request: &mut Request,
 ) -> Result<ResponseType, AppError> {
     match (method, path) {
-        (&Method::Get, "/") => health_check(),
+        (_, p) if p.starts_with("/pz-admin") => serve_static(request),
         (&Method::Get, p) if p.starts_with("/api/blog/") => find_blog_by_id(conn, p),
         (&Method::Get, "/api/blogs") => get_all_blog_posts(conn),
         (&Method::Post, "/api/blog/new") => create_new_blog_post(conn, request),
         (&Method::Post, "/api/blog/update") => update_blog_post(conn, request),
         (&Method::Post, "/api/plugin/demo") => get_table_of_contents(request),
         (&Method::Delete, p) if p.starts_with("/api/blog/delete/") => delete_blog_post(conn, p),
-        (_, p) if p.starts_with("/pz-admin") => serve_static(request),
+        (&Method::Get, _) => get_post_by_slug(conn, path),
         _ => Err(AppError::PageNotFound("".to_string())),
     }
 }
@@ -41,9 +41,9 @@ fn health_check() -> Result<ResponseType, AppError> {
     ))
 }
 
-fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseType, AppError> {
-    let id = p.strip_prefix("/api/blog/").unwrap();
-    let post = db::get_post(&conn.lock().unwrap(), id, false)?;
+fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseType, AppError> {
+    let slug = p.strip_prefix("/").unwrap_or(p);
+    let post = db::get_post(&conn.lock().unwrap(), slug, true)?;
     match post {
         Some(post) => {
             let md_str = post.content; // Assuming `post.content` contains the markdown string
@@ -54,11 +54,28 @@ fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTyp
             render_page("plugins/page.json", md_content)
         }
         None => Err(AppError::PageNotFound(format!(
+            "No post found for slug: {}",
+            slug,
+        ))),
+    }
+}
+
+fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseType, AppError> {
+    let id = p.strip_prefix("/api/blog/").unwrap();
+    let post = db::get_post(&conn.lock().unwrap(), id, false)?;
+    match post {
+        Some(post) => {
+            Ok(ResponseType::Json(
+                json!({"data": post})
+            ))
+        }
+        None => Err(AppError::PageNotFound(format!(
             "No post found for id: {}",
             id
         ))),
     }
 }
+
 
 fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> {
     let manifest = std::fs::read(manifest).unwrap();
