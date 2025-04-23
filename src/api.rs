@@ -25,6 +25,7 @@ pub fn route_request(
         (&Method::Post, "/api/blog/update") => update_blog_post(conn, request),
         (&Method::Post, "/api/plugin/demo") => get_table_of_contents(request),
         (&Method::Delete, p) if p.starts_with("/api/blog/delete/") => delete_blog_post(conn, p),
+        (_, _) if path.starts_with("/api") => not_implemented_error(request),
         (&Method::Get, _) => get_post_by_slug(conn, path),
         _ => Err(AppError::PageNotFound("".to_string())),
     }
@@ -270,4 +271,10 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
         .unwrap_or("txt");
     let content = fs::read(&file_path).unwrap();
     Ok(ResponseType::Binary(content, get_mime_type(file_extension).to_string()))
+}
+
+fn not_implemented_error(request: &mut Request) -> Result<ResponseType, AppError> {
+    Err(
+        AppError::ServerError("Not implemented yet".to_string())
+    )
 }
