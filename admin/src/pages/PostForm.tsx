@@ -1,11 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { ChangeEventHandler, useEffect, useState } from 'react';
 import { TextInput, Textarea, Button, Group, LoadingOverlay } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { usePosts } from '../contexts/PostsContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Post } from '../types';
+import { lexer, TokensList } from 'marked';
+import { getPost } from '@/api/posts';
 
+window.lexer = lexer;
 export function PostForm() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -14,7 +17,10 @@ export function PostForm() {
   const [initialValues, setInitialValues] = useState<Partial<Post>>({
     title: '',
     slug: '',
-    content: '',
+    content: {
+      md: '',
+      json: undefined,
+    },
     author: user?.name || '',
   });
 
@@ -22,17 +28,29 @@ export function PostForm() {
     initialValues,
     validate: {
       title: (value) => !value ? 'Title is required' : null,
-      slug: (value) => !value ? 'Slug is required' : null,
+      slug: (value) => /^([a-z0-9]+(-[a-z0-9]+)*)?$/.test(value) ? null : 'Invalid slug',
       content: (value) => !value ? 'Content is required' : null,
     },
   });
 
   useEffect(() => {
     if (id) {
-      // Fetch post data if editing
-      // In a real app, you would fetch the post data here
+      fetchPost(id);
     }
   }, [id]);
+
+  async function fetchPost(id: string) {
+    const post = await getPost(id);
+    if(post) {
+      if(typeof(post?.content) === 'string') {
+        post.content = {
+          md: post.content as string,
+          json: lexer(post.content as string),
+        };
+      }
+      form.setValues(post);
+    }
+  }
 
   const handleSubmit = async (values: typeof initialValues) => {
     try {
@@ -46,6 +64,18 @@ export function PostForm() {
       console.error('Failed to save post:', error);
     }
   };
+
+  function updateContent(e: ChangeEventHandler<HTMLTextAreaElement>) {
+    const value = e.target.value as string;
+    const json = lexer(value);
+    console.log(json);
+    form.setValues({
+      content: {
+        md: value,
+        json,
+      },
+    });
+  }
 
   return (
     <div className="relative">
@@ -68,17 +98,20 @@ export function PostForm() {
           label="Content"
           placeholder="Enter post content"
           required
-          minRows={5}
+          minRows={10}
+          rows={8}
           className="mb-4"
-          {...form.getInputProps('content')}
+          {...form.getInputProps('content.md')}
+          onChange={updateContent}
         />
 
         <TextInput
           label="Slug"
           placeholder="Enter post Slug"
-          required
           className="mb-4"
           {...form.getInputProps('slug')}
+          pattern="^([a-z0-9]+(-[a-z0-9]+)*)?$"
+          leftSection={"/"}
         />
 
 

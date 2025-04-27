@@ -1,7 +1,14 @@
+import { TokensList } from "marked";
+
+export interface PostContentType {
+  md: string,
+  json?: TokensList;
+}
+
 export interface Post {
   id: string;
   title: string;
-  content: string;
+  content: PostContentType;
   author: string;
   slug: string;
   created_at: string;
