@@ -10,6 +10,8 @@ mod mime;
 mod plugin;
 mod post;
 mod server;
+mod plugin_manager;
+mod render;
 
 use rusqlite::Connection;
 use serde_json::json;
@@ -27,45 +29,11 @@ fn main() -> Result<(), AppError> {
     // If no blogs are there then create one sample blog.
     if db::get_all_post(&conn)?.is_empty() {
         let blog_post = BlogPost::new(
-            "example",
+            "",
             "PageZest Example Blog",
-            json!(
-                {
-                    "md" : "#This is heading1\nContents of Line1\n##    This is Heading2\n  Contents of Line2",
-                    "json": {
-                    "type": "root",
-                    "children": [
-                        {
-                            "type": "heading",
-                            "raw": "# Heading-1\n\n",
-                            "depth": 1,
-                            "text": "Heading-1",
-                            "tokens": [
-                                {
-                                    "type": "text",
-                                    "raw": "Heading-1",
-                                    "text": "Heading-1",
-                                    "escaped": false
-                                }
-                            ]
-                        },
-                        {
-                            "type": "heading",
-                            "raw": "## Heading-2\n\n",
-                            "depth": 2,
-                            "text": "Heading-2",
-                            "tokens": [
-                                {
-                                    "type": "text",
-                                    "raw": "Heading-2",
-                                    "text": "Heading-2",
-                                    "escaped": false
-                                }
-                            ]
-                        }
-                    ]
-                }
-                }
+            json!({
+                "json":[{"depth":1,"raw":"# This is heading1\n","text":"This is heading1","tokens":[{"escaped":false,"raw":"This is heading1","text":"This is heading1","type":"text"}],"type":"heading"},{"raw":"Contents of Line1\n","text":"Contents of Line1","tokens":[{"escaped":false,"raw":"Contents of Line1","text":"Contents of Line1","type":"text"}],"type":"paragraph"},{"depth":2,"raw":"##    This is Heading2\n","text":"This is Heading2","tokens":[{"escaped":false,"raw":"This is Heading2","text":"This is Heading2","type":"text"}],"type":"heading"},{"raw":"Contents of Line2","text":"Contents of Line2","tokens":[{"escaped":false,"raw":"Contents of Line2","text":"Contents of Line2","type":"text"}],"type":"paragraph"}],
+                "md":"# This is heading1\nContents of Line1\n##    This is Heading2\nContents of Line2"}
             ),
         );
         db::create_post(&conn, blog_post).unwrap();
