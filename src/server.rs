@@ -7,11 +7,15 @@ use tiny_http::{Response, Server};
 use crate::api::{ResponseType, load_sample_image, route_request};
 use crate::errors::AppError;
 use crate::memory::get_process_memory;
+use crate::plugin_manager::PluginManager;
 
 pub fn run_server(conn: Connection) -> Result<(), AppError> {
     println!("Starting Web Server");
     let m1 = get_process_memory();
     let shared_conn = Arc::new(Mutex::new(conn));
+    let mut plugin_manager = PluginManager::new();
+    plugin_manager.scan_plugins().expect("Plugins scan error");
+    let shared_plugin_manager = Arc::new(Mutex::new(plugin_manager));
     let server = Server::http("0.0.0.0:8080")?;
     println!("Memory after starting server : {} KB", m1);
 
@@ -25,7 +29,7 @@ pub fn run_server(conn: Connection) -> Result<(), AppError> {
         if path == "/api/test-image" {
             response = load_sample_image().unwrap();
         } else {
-            response = match route_request(&method, &path, &shared_conn, &mut request) {
+            response = match route_request(&method, &path, &shared_conn, &shared_plugin_manager, &mut request) {
                 Ok(ResponseType::Json(body)) => {
                     let body_str = serde_json::to_string(&body)
                         .unwrap_or_else(|_| "{\"error\": \"Internal Server Error\"}".to_string());
