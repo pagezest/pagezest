@@ -1,9 +1,9 @@
 use rusqlite::Connection;
 use serde_json::{ Value, json };
-use std::{ fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
+use std::{ error::Error, fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
 use tiny_http::{ Header, Method, Request, Response };
 
-use crate::{ db, errors::AppError, mime::get_mime_type, plugin::call_wasm, post::BlogPost };
+use crate::{ db, errors::AppError, mime::get_mime_type, plugin::call_wasm, plugin_manager::{Plugin, PluginManager}, post::BlogPost, render::json_to_html };
 
 pub enum ResponseType {
     Json(Value),
@@ -15,6 +15,7 @@ pub fn route_request(
     method: &Method,
     path: &str,
     conn: &Arc<Mutex<Connection>>,
+    plugin_manager: &Arc<Mutex<PluginManager>>,
     request: &mut Request
 ) -> Result<ResponseType, AppError> {
     match (method, path) {
@@ -26,12 +27,12 @@ pub fn route_request(
         (&Method::Post, "/api/plugin/demo") => get_table_of_contents(request),
         (&Method::Delete, p) if p.starts_with("/api/blog/delete/") => delete_blog_post(conn, p),
         (_, _) if path.starts_with("/api") => not_implemented_error(request),
-        (&Method::Get, _) => get_post_by_slug(conn, path),
+        (&Method::Get, _) => get_post_by_slug(conn, plugin_manager, path),
         _ => Err(AppError::PageNotFound("".to_string())),
     }
 }
 
-fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseType, AppError> {
+fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, plugin_manager: &Arc<Mutex<PluginManager>>, p: &str) -> Result<ResponseType, AppError> {
     let slug = p.strip_prefix("/").unwrap_or(p);
     let post = db::get_post(&conn.lock().unwrap(), slug, true)?;
     match post {
@@ -45,7 +46,7 @@ fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTy
                     )
                 })?;
             let md_content_str = md_content.to_string();
-            render_page("plugins/page.json", &md_content_str)
+            render_page("plugins/page.json", plugin_manager, &md_content_str)
         }
         None => Err(AppError::PageNotFound(format!("No post found for slug: {}", slug))),
     }
@@ -60,7 +61,7 @@ fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTyp
     }
 }
 
-fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> {
+fn render_page(manifest: &str, plugin_manager: &Arc<Mutex<PluginManager>>, content: &str) -> Result<ResponseType, AppError> {
     let manifest = std::fs::read(manifest).unwrap();
     let manifest_json: Value = serde_json
         ::from_slice(&manifest)
@@ -76,7 +77,12 @@ fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> 
         .filter_map(|v| v.as_str().map(String::from))
         .collect::<Vec<String>>();
 
+    //let mut plugin_manager = &plugin_manager.lock().unwrap();
+    let content_json: Value = serde_json::from_str(content).unwrap();
+
     let mut page_contents = String::new();
+    let plugin_manager = plugin_manager.lock().unwrap();
+    /*
     for val in order {
         if val == "toc" {
             let toc_response = call_wasm("plugins/page.wasm", content, "toc").unwrap();
@@ -106,7 +112,38 @@ fn render_page(manifest: &str, content: &str) -> Result<ResponseType, AppError> 
                 })?;
             page_contents.push_str(&format!("{}\n", toc_html));
         }
+        else if plugin_manager.has_plugin_handler(&val) {
+            let plugin = plugin_manager.get_plugin_by_tag(&val).unwrap();
+            match plugin.borrow_mut().call(content) {
+                Ok(resp) => {
+                    page_contents.push_str(&resp);
+                },
+                Err(e) => {
+                    let s = format!("Error with {}\n{}", val, e.to_string());
+                    page_contents.push_str(&s);
+                },
+            }
+        }
+        else {
+            let s = format!("No handler for {}", val);
+            page_contents.push_str(&s);
+        }
     }
+    */
+    match json_to_html(content, plugin_manager) {
+        Ok(s) => {
+            page_contents.push_str(&s);
+            return Ok(ResponseType::Html(page_contents));
+            //page_contents.push_str(&json_to_html(content, plugin_manager).unwrap());
+        },
+        Err(e) => {
+            println!("run error: {}", e.to_string());
+        }
+        
+    }
+    page_contents.push_str("<pre>");
+    page_contents.push_str(&serde_json::to_string_pretty(&content_json).unwrap());
+    page_contents.push_str("</pre>");
     Ok(ResponseType::Html(page_contents))
 }
 
