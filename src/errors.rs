@@ -18,4 +18,7 @@ pub enum AppError {
 
     #[error("Page Not Found: {0}")]
     PageNotFound(String),
+
+    #[error("Plugin Not Found: {0}")]
+    PluginError(String),
 }
