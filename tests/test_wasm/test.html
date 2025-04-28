@@ -1,0 +1,59 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <h2>
+      WASM
+    </h2>
+    <script>
+      let wasmBuff, wasm, wasmInstance, wasmModule, dv;
+      const env ={
+        memory: new WebAssembly.Memory({initial: 1}),
+        abort: (msgPtr, filePtr, line, column) => {
+          const decoder = new TextDecoder('utf-8');
+          const msg = decoder.decode(new Uint8Array(env.memory.buffer, msgPtr));
+          console.error(`Abort: ${msg} at ${filePtr}:${line}:${column}`);
+          throw new Error(`Abort: ${msg}`);
+        },
+        'console.log': (a, b) => {
+          console.log('console called', a, b);
+        },
+      }
+
+      async function init() {
+        wasmBuff = await fetch('./test.wasm').then(a => a.arrayBuffer());
+        wasm = await WebAssembly.instantiate(wasmBuff, {
+          env,
+        });
+        wasmInstance = wasm.instance;
+        wasmModule = wasm.module;
+
+        const input = "hello there";
+
+        dv = new DataView(wasmInstance.exports.memory.buffer);
+        const mallocPtr = wasmInstance.exports.malloc(1024);
+
+        const ch = [];
+
+
+
+        for(let i=0; i<input.length; i++) {
+          dv.setUint8(mallocPtr + i, input.charCodeAt(i));
+        }
+        dv.setUint8(mallocPtr + input.length + 1, 0);
+        const p = wasmInstance.exports.toc(mallocPtr, input.length);
+
+        for(let i=0; i<1e2; i++) {
+          const v = dv.getUint8(p + i);
+          if(v===0) break;
+          const c = String.fromCharCode(v);
+          ch.push(c);
+        }
+        console.log({mallocPtr, res: p});
+        //const res = Array.from({length: 128}, (_, i) => dv.getUint8(p+i));
+        console.log(ch.join(''));
+      }
+      init();
+    </script>
+  </body>
+</html>
