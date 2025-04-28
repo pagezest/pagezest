@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::MutexGuard};
 
-use serde::Deserialize;
-use serde_json::Value;
+use serde::{ser, Deserialize};
+use serde_json::{json, Value};
 
 use crate::plugin_manager::PluginManager;
 
@@ -103,7 +103,7 @@ pub fn json_to_html(json_input: &str, mut plugin_manager: MutexGuard<'_, PluginM
     html.push_str("</head>");
     html.push_str("<body>");
     for block in blocks {
-        html.push_str(&render_block(&block, &mut plugin_manager));
+        html.push_str(&render_block(&block, root.clone(), &mut plugin_manager));
     }
     html.push_str("<pre>");
     //html.push_str(json_input);
@@ -115,18 +115,18 @@ pub fn json_to_html(json_input: &str, mut plugin_manager: MutexGuard<'_, PluginM
     Ok(html.to_string())
 }
 
-fn render_block(block: &Block, plugin_manager: &mut PluginManager) -> String {
+fn render_block(block: &Block, root: Value, plugin_manager: &mut PluginManager) -> String {
     match block {
         Block::Space => "\n".to_string(),
         Block::Paragraph { tokens, text } => {
-            if let Some(custom) = try_handle_custom_tag(text, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(text, root.clone(), plugin_manager) {
                 custom
             } else {
                 format!("<p>{}</p>\n", render_inlines(tokens))
             }
         }
         Block::Heading { depth, tokens, text } => {
-            if let Some(custom) = try_handle_custom_tag(text, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(text, root.clone(), plugin_manager) {
                 custom
             } else {
                 format!("<h{d}>{}</h{d}>\n", render_inlines(tokens), d = depth)
@@ -152,7 +152,7 @@ fn render_block(block: &Block, plugin_manager: &mut PluginManager) -> String {
         }
         Block::Blockquote { tokens } => {
             let content = tokens.iter()
-                .map(|x| render_block(x, plugin_manager))
+                .map(|x| render_block(x, root.clone(), plugin_manager))
                 .collect::<Vec<_>>()
                 .join("\n");
             format!("<blockquote>\n{}</blockquote>\n", content)
@@ -208,7 +208,7 @@ fn html_escape(input: &str) -> String {
         .replace('\'', "&#39;")
 }
 
-fn try_handle_custom_tag(text: &str, plugin_manager: &mut PluginManager) -> Option<String> {
+fn try_handle_custom_tag(text: &str, root: Value, plugin_manager: &mut PluginManager) -> Option<String> {
     let trimmed = text.trim();
     if let Some(start) = trimmed.find("[[") {
         if let Some(end) = trimmed.find("]]") {
@@ -217,7 +217,7 @@ fn try_handle_custom_tag(text: &str, plugin_manager: &mut PluginManager) -> Opti
             let close_tag = format!("[[/{}]]", tag_name);
             if let Some(close_start) = trimmed.find(&close_tag) {
                 let content = &trimmed[end + 2..close_start];
-                return Some(handle_custom_tag(&tag_name, content, attributes, plugin_manager))?;
+                return Some(handle_custom_tag(&tag_name, content, attributes, root.clone(), plugin_manager))?;
             }
         }
     }
@@ -290,24 +290,34 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
     (tag_name, attributes)
 }
 
-fn handle_custom_tag(tag: &str, content: &str, attribs: HashMap<String, String>, plugin_manager: &mut PluginManager) -> Option<String> {
+fn handle_custom_tag(tag: &str, content: &str, attribs: HashMap<String, String>, root: Value, plugin_manager: &mut PluginManager) -> Option<String> {
     if tag == "custom-html" {
         return Some(content.to_string())
     }
+    let plugin_input = json!({
+        "tag": tag,
+        "root": root,
+        "attributes": attribs,
+    });
     if plugin_manager.has_plugin_handler(tag) {
         match plugin_manager.get_plugin_by_tag(tag) {
            Ok(func) => {
-               match func.borrow_mut().call(content) {
+               println!("rendering custom tag: {}", tag);
+               match func.borrow_mut().call(&plugin_input.to_string()) {
                    Ok(v) => {
+                       return Some(v)
                    },
-                   _ => {
+                   Err(e) => {
+                       println!("plugin call error: {}", e.to_string());
+                       return Some("Plugin error".to_string())
                    },
                }
            },
            _ => {
+               return Some("could not call function".to_string())
            }
         }
     }
-    println!("custom tag!: {}", tag);
-    Some(format!("-- custom tag[{}]: {}", tag, html_escape(content)))
+    println!("no handler for: {}", tag);
+    Some(format!("custom tag[{}]: {}", tag, html_escape(content)))
 }
