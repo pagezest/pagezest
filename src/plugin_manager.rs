@@ -23,103 +23,103 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
-   pub fn new() -> Self {
-        Self { plugins: HashMap::new() }
-   }
+    pub fn new() -> Self {
+         Self { plugins: HashMap::new() }
+    }
 
-   pub fn load_plugin(&mut self, plugin: Plugin) {
-       //let plugin = Plugin::new(name, tag);
-       self.plugins.insert(plugin.tag.to_string(), Rc::new(RefCell::new(plugin)));
-   }
+    pub fn load_plugin(&mut self, plugin: Plugin) {
+        //let plugin = Plugin::new(name, tag);
+        self.plugins.insert(plugin.tag.to_string(), Rc::new(RefCell::new(plugin)));
+    }
 
-   pub fn unload_plugin(&mut self, tag: &str) {
-       self.plugins.remove(tag);
-   }
+    pub fn unload_plugin(&mut self, tag: &str) {
+        self.plugins.remove(tag);
+    }
 
-   pub fn list_plugins(self) {
-       self.plugins.keys();
-   }
+    pub fn list_plugins(self) {
+        self.plugins.keys();
+    }
 
-   pub fn has_plugin_handler(&mut self, tag: &str) -> bool {
-       self.plugins.contains_key(tag)
-   }
+    pub fn has_plugin_handler(&mut self, tag: &str) -> bool {
+        self.plugins.contains_key(tag)
+    }
 
-   pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Rc<RefCell<Plugin>>, AppError> {
-       match self.plugins.get(tag) {
-           Some(plugin) => {
-               Ok(plugin)
-           },
-           _ => {
-               Err(AppError::PluginError("Not found".to_string()))
-           }
-       }
-
-   }
-
-   pub fn load_plugin_dir(&mut self, path: PathBuf) -> Result<(), Box<dyn Error>> {
-       if path.is_dir() {
-            let manifest_path = path.join("manifest.json");
-            if manifest_path.exists() {
-                match fs::read_to_string(manifest_path) {
-                    Ok(manifest_content) => {
-                        let json: Value = serde_json::from_str(&manifest_content).expect("could not parse manifest");
-                        let name = json.get("name").and_then(|s| s.as_str()).expect("Manifest: name not found").to_string();
-                        let tag = json.get("tag").and_then(|s| s.as_str()).expect("Manifest: tag not found {}").to_string();
-                        let wasm_path = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
-                        let wasm_path_org = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
-                        let plugin_func_name = json.get("func_name").and_then(|s| s.as_str()).expect("Manifest: func_name not found").to_string();
-                        let wasm_path = path.join(wasm_path);
-                        let wasm_path_str = wasm_path.to_str().unwrap();
-                        match Plugin::new(&name, &tag, wasm_path_str, &plugin_func_name) {
-                            Ok(plugin) => {
-                                self.load_plugin(plugin);
-                                println!("plugin loaded: {}", path.to_str().unwrap());
-                            },
-                            Err(e) => {
-                                return Err(e.into());
-                            }
-                        }
-                    },
-                    Err(e) => {
-                        return Err(Box::new(e));
-                    }
-                }
-            } else {
-                println!("no manifest file in {}, skipping", path.to_str().unwrap());
+    pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Rc<RefCell<Plugin>>, AppError> {
+        match self.plugins.get(tag) {
+            Some(plugin) => {
+                Ok(plugin)
+            },
+            _ => {
+                Err(AppError::PluginError("Not found".to_string()))
             }
-       }
-       Ok(())
-   }
+        }
 
-   pub fn scan_plugins(&mut self) -> Result<(), AppError> {
-       let plugins_path = env::var("CARGO_MANIFEST_DIR").unwrap_or("./".to_string());
-       let path = Path::new(&plugins_path).join("plugins");
-       if path.exists() && path.is_dir() {
-           println!("plugins path: {}", path.to_str().unwrap());
-            if let Ok(entries) = fs::read_dir(path) {
-                for entry in entries.filter_map(Result::ok) {
-                    let entry_path = entry.path();
-                    if ! entry_path.is_dir() {
-                        continue;
-                    }
-                    match self.load_plugin_dir(entry_path) {
-                        Ok(()) => {
-                        },
-                        Err(e) => {
-                            println!("Error loading plugin: {}", e.to_string());
-                        }
-                    }
-                }
-            }
-       } else {
-           println!("no plugins")
-       }
-       println!("plugins loaded:");
-       for (k, _) in self.plugins.clone() {
-            println!("{}", k);
-       }
-       Ok(())
-   }
+    }
+
+    pub fn load_plugin_dir(&mut self, path: PathBuf) -> Result<(), Box<dyn Error>> {
+        if path.is_dir() {
+             let manifest_path = path.join("manifest.json");
+             if manifest_path.exists() {
+                 match fs::read_to_string(manifest_path) {
+                     Ok(manifest_content) => {
+                         let json: Value = serde_json::from_str(&manifest_content).expect("could not parse manifest");
+                         let name = json.get("name").and_then(|s| s.as_str()).expect("Manifest: name not found").to_string();
+                         let tag = json.get("tag").and_then(|s| s.as_str()).expect("Manifest: tag not found {}").to_string();
+                         let wasm_path = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
+                         let wasm_path_org = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
+                         let plugin_func_name = json.get("func_name").and_then(|s| s.as_str()).expect("Manifest: func_name not found").to_string();
+                         let wasm_path = path.join(wasm_path);
+                         let wasm_path_str = wasm_path.to_str().unwrap();
+                         match Plugin::new(&name, &tag, wasm_path_str, &plugin_func_name) {
+                             Ok(plugin) => {
+                                 self.load_plugin(plugin);
+                                 println!("plugin loaded: {}", path.to_str().unwrap());
+                             },
+                             Err(e) => {
+                                 return Err(e.into());
+                             }
+                         }
+                     },
+                     Err(e) => {
+                         return Err(Box::new(e));
+                     }
+                 }
+             } else {
+                 println!("no manifest file in {}, skipping", path.to_str().unwrap());
+             }
+        }
+        Ok(())
+    }
+
+    pub fn scan_plugins(&mut self) -> Result<(), AppError> {
+        let plugins_path = env::var("CARGO_MANIFEST_DIR").unwrap_or("./".to_string());
+        let path = Path::new(&plugins_path).join("plugins");
+        if path.exists() && path.is_dir() {
+            println!("plugins path: {}", path.to_str().unwrap());
+             if let Ok(entries) = fs::read_dir(path) {
+                 for entry in entries.filter_map(Result::ok) {
+                     let entry_path = entry.path();
+                     if ! entry_path.is_dir() {
+                         continue;
+                     }
+                     match self.load_plugin_dir(entry_path) {
+                         Ok(()) => {
+                         },
+                         Err(e) => {
+                             println!("Error loading plugin: {}", e.to_string());
+                         }
+                     }
+                 }
+             }
+        } else {
+            println!("no plugins")
+        }
+        println!("plugins loaded:");
+        for (k, _) in self.plugins.clone() {
+             println!("{}", k);
+        }
+        Ok(())
+    }
 }
 
 impl Plugin {
@@ -161,11 +161,9 @@ impl Plugin {
     ) -> Result<String, Box<dyn Error>> {
         let offset = 0u32;
         self.memory
-            .write(&mut self.store.as_context_mut(), offset as usize, input.as_bytes())
-            .unwrap();
+            .write(&mut self.store.as_context_mut(), offset as usize, input.as_bytes())?;
         self.memory
-            .write(&mut self.store, input.len() as usize, &vec![0u8, 0u8])
-            .unwrap();
+            .write(&mut self.store, input.len() as usize, &vec![0u8, 0u8])?;
         println!("write memory OK: {}", input.len());
         let res_ptr = (&mut self.plugin_func)
             .call(&mut self.store, (offset, input.len() as u32))?;
@@ -175,8 +173,7 @@ impl Plugin {
         loop {
             let mut buf = [0u8, 1];
             self.memory
-                .read(&mut self.store, curr_ptr as usize, &mut buf)
-                .unwrap();
+                .read(&mut self.store, curr_ptr as usize, &mut buf)?;
             if buf[0] == 0 {
                 break;
             }
