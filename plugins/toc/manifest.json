@@ -1,4 +1,5 @@
 {
+  "version": "1.0",
   "name": "toc",
   "tag": "toc",
   "wasm_path": "toc.wasm",
