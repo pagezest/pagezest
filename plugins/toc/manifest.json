@@ -1,0 +1,6 @@
+{
+  "name": "toc",
+  "tag": "toc",
+  "wasm_path": "toc.wasm",
+  "func_name": "toc"
+}
