@@ -1,7 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, error::Error, fs, path::{Path, PathBuf}, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, env, error::Error, fs, path::{Path, PathBuf}, rc::Rc};
 
 use serde_json::Value;
-use wasmi::{Caller, Config, Engine, Func, Instance, Linker, Memory, Module, Store, TypedFunc};
+use wasmi::{AsContextMut, Caller, Config, Engine, Func, Instance, Linker, Memory, Module, Store, TypedFunc};
 
 use crate::errors::AppError;
 
@@ -63,8 +63,8 @@ impl PluginManager {
                 match fs::read_to_string(manifest_path) {
                     Ok(manifest_content) => {
                         let json: Value = serde_json::from_str(&manifest_content).expect("could not parse manifest");
-                        let name = json.get("name").expect("Manifest: name not found").to_string();
-                        let tag = json.get("tag").expect("Manifest: tag not found {}").to_string();
+                        let name = json.get("name").and_then(|s| s.as_str()).expect("Manifest: name not found").to_string();
+                        let tag = json.get("tag").and_then(|s| s.as_str()).expect("Manifest: tag not found {}").to_string();
                         let wasm_path = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
                         let wasm_path_org = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
                         let plugin_func_name = json.get("func_name").and_then(|s| s.as_str()).expect("Manifest: func_name not found").to_string();
@@ -73,6 +73,7 @@ impl PluginManager {
                         match Plugin::new(&name, &tag, wasm_path_str, &plugin_func_name) {
                             Ok(plugin) => {
                                 self.load_plugin(plugin);
+                                println!("plugin loaded: {}", path.to_str().unwrap());
                             },
                             Err(e) => {
                                 return Err(e.into());
@@ -83,20 +84,39 @@ impl PluginManager {
                         return Err(Box::new(e));
                     }
                 }
+            } else {
+                println!("no manifest file in {}, skipping", path.to_str().unwrap());
             }
        }
        Ok(())
    }
 
    pub fn scan_plugins(&mut self) -> Result<(), AppError> {
-       let path = Path::new("plugins");
-       if path.is_dir() {
+       let plugins_path = env::var("CARGO_MANIFEST_DIR").unwrap_or("./".to_string());
+       let path = Path::new(&plugins_path).join("plugins");
+       if path.exists() && path.is_dir() {
+           println!("plugins path: {}", path.to_str().unwrap());
             if let Ok(entries) = fs::read_dir(path) {
                 for entry in entries.filter_map(Result::ok) {
                     let entry_path = entry.path();
-                    self.load_plugin_dir(entry_path).expect("Error loading plugin");
+                    if ! entry_path.is_dir() {
+                        continue;
+                    }
+                    match self.load_plugin_dir(entry_path) {
+                        Ok(()) => {
+                        },
+                        Err(e) => {
+                            println!("Error loading plugin: {}", e.to_string());
+                        }
+                    }
                 }
             }
+       } else {
+           println!("no plugins")
+       }
+       println!("plugins loaded:");
+       for (k, _) in self.plugins.clone() {
+            println!("{}", k);
        }
        Ok(())
    }
@@ -112,6 +132,8 @@ impl Plugin {
         let mut linker = Linker::new(&engine);
         let abort_func = Func::wrap(&mut store, abort_stub);
         linker.define("env", "abort", abort_func)?;
+        let console_log_func = Func::wrap(&mut store, console_log_stub);
+        linker.define("env", "console.log", console_log_func)?;
         let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
 
         let memory = instance
@@ -138,8 +160,16 @@ impl Plugin {
         &mut self, input: &str
     ) -> Result<String, Box<dyn Error>> {
         let offset = 0u32;
-        let res_ptr = (self.plugin_func)
+        self.memory
+            .write(&mut self.store.as_context_mut(), offset as usize, input.as_bytes())
+            .unwrap();
+        self.memory
+            .write(&mut self.store, input.len() as usize, &vec![0u8, 0u8])
+            .unwrap();
+        println!("write memory OK: {}", input.len());
+        let res_ptr = (&mut self.plugin_func)
             .call(&mut self.store, (offset, input.len() as u32))?;
+        println!("**********reading resp: {}", res_ptr);
         let mut output = Vec::new();
         let mut curr_ptr = res_ptr;
         loop {
@@ -152,6 +182,9 @@ impl Plugin {
             }
             output.push(buf[0]);
             curr_ptr += 1;
+            if curr_ptr > 1024 {
+                break;
+            }
         }
 
         let output_str = String::from_utf8(output).unwrap();
@@ -160,7 +193,13 @@ impl Plugin {
     }
 }
 
-fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {}
+fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {
+    println!("abort: msg: {}, file: {}, line: {}, col: {}", _msg_ptr, _file_ptr, _line, _col);
+}
+
+fn console_log_stub(_caller: Caller<'_, ()>, _msg_ptr: i32) {
+    println!("console.log called");
+}
 
 
 #[cfg(test)]
