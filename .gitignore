@@ -1,2 +1,7 @@
+# Rust artifacts
 /target
+
+# Zest project uses build/ to deposit all build artifacts (plugins, rust binary, pz-admin UI)
+build/
+
 pagezest.db
