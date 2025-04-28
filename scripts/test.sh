@@ -16,9 +16,24 @@ test_ui() {
   ./pagezest
 }
 
+test_backend() {
+  cd $TOP
+  cargo build
+  cd $TOP/target/debug
+  ./pagezest
+}
+
 main() {
   case "$1" in
     ui) test_ui ;;
+    b) test_backend ;;
+    *)
+      set +x
+      echo "Invalid option: \`$1\`" >&2
+      echo "Usage: $0"
+      echo "  ui: run the ui"
+      echo "  b: run the backend"
+      ;;
   esac
 }
 
