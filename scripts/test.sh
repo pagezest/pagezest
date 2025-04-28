@@ -33,6 +33,9 @@ test_plugins() {
   cp $TOP/plugins/page.json $TOP/build/plugins/page.json
   rm -rf $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc/ $TOP/build/plugins/toc/
+
+  # This last cp is purely if you want to test the wasm in the browser.
+  cp -r $TOP/plugins/toc/toc.wasm $TOP/tests/test_wasm/test.wasm
 }
 
 main() {
