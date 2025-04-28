@@ -24,10 +24,17 @@ test_backend() {
   ./pagezest
 }
 
-main() {
-  mkdir -p $TOP/build/
+test_plugins() {
+  # TODO: compile the TOC plugin
   mkdir -p $TOP/build/plugins/
   cp $TOP/plugins/page.json $TOP/build/plugins/page.json
+  rm -rf $TOP/build/plugins/toc/
+  cp -r $TOP/plugins/toc/ $TOP/build/plugins/toc/
+}
+
+main() {
+  mkdir -p $TOP/build/
+  test_plugins
 
   case "$1" in
     ui) test_ui ;;

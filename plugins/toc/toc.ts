@@ -31,5 +31,4 @@ export function toc(ptr: usize, len: i32): usize {
 
     //return 0;
     //return output_ptr;
-
 }
