@@ -48,6 +48,7 @@ main() {
       echo "Usage: $0"
       echo "  ui: run the ui"
       echo "  b: run the backend"
+      echo "  p: run the plugins"
       ;;
   esac
 }
