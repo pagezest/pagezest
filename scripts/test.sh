@@ -12,6 +12,8 @@ test_ui() {
   cd $TOP
   rm -rf $TOP/target/debug/pz-admin
   cp -r $TOP/admin/dist $TOP/target/debug/pz-admin
+  cd $TOP/target/debug
+  ./pagezest
 }
 
 main() {
