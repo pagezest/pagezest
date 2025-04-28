@@ -24,9 +24,12 @@ test_backend() {
   ./pagezest
 }
 
+# NOTE: for now, this compiles ONLY the toc (table of contents) plugin
 test_plugins() {
-  # TODO: compile the TOC plugin
   mkdir -p $TOP/build/plugins/
+  cd $TOP/plugins/
+  npm install
+  npx asc toc/toc.ts --target release --exportRuntime --exportTable --outFile toc/toc.wasm
   cp $TOP/plugins/page.json $TOP/build/plugins/page.json
   rm -rf $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc/ $TOP/build/plugins/toc/
@@ -34,11 +37,11 @@ test_plugins() {
 
 main() {
   mkdir -p $TOP/build/
-  test_plugins
 
   case "$1" in
     ui) test_ui ;;
     b) test_backend ;;
+    p) test_plugins ;;
     *)
       set +x
       echo "Invalid option: \`$1\`" >&2
