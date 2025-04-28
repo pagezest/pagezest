@@ -10,20 +10,25 @@ test_ui() {
   npm install
   npm run build
   cd $TOP
-  rm -rf $TOP/target/debug/pz-admin
-  cp -r $TOP/admin/dist $TOP/target/debug/pz-admin
-  cd $TOP/target/debug
+  rm -rf $TOP/build/pz-admin/
+  cp -r $TOP/admin/dist/ $TOP/build/pz-admin/
+  cd $TOP/build
   ./pagezest
 }
 
 test_backend() {
   cd $TOP
   cargo build
-  cd $TOP/target/debug
+  cp $TOP/target/debug/pagezest $TOP/build/
+  cd $TOP/build/
   ./pagezest
 }
 
 main() {
+  mkdir -p $TOP/build/
+  mkdir -p $TOP/build/plugins/
+  cp $TOP/plugins/page.json $TOP/build/plugins/page.json
+
   case "$1" in
     ui) test_ui ;;
     b) test_backend ;;
