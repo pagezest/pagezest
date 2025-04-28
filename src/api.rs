@@ -306,8 +306,11 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or("txt");
-    let content = fs::read(&file_path).unwrap();
-    Ok(ResponseType::Binary(content, get_mime_type(file_extension).to_string()))
+    if file_path.exists() {
+        let content = fs::read(&file_path).unwrap();
+        return Ok(ResponseType::Binary(content, get_mime_type(file_extension).to_string()))
+    }
+    Err(AppError::PageNotFound("not found".to_string()))
 }
 
 fn not_implemented_error(request: &mut Request) -> Result<ResponseType, AppError> {
