@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::MutexGuard};
 use serde::{ser, Deserialize};
 use serde_json::{json, Value};
 
-use crate::plugin_manager::PluginManager;
+use crate::{plugin::call_wasm, plugin_manager::PluginManager};
 
 const STYLE: &str = include_str!("../assets/milligram.min.css");
 
@@ -300,22 +300,14 @@ fn handle_custom_tag(tag: &str, content: &str, attribs: HashMap<String, String>,
         "attributes": attribs,
     });
     if plugin_manager.has_plugin_handler(tag) {
-        match plugin_manager.get_plugin_by_tag(tag) {
-           Ok(func) => {
-               println!("rendering custom tag: {}", tag);
-               match func.borrow_mut().call(&plugin_input.to_string()) {
-                   Ok(v) => {
-                       return Some(v)
-                   },
-                   Err(e) => {
-                       println!("plugin call error: {}", e.to_string());
-                       return Some("Plugin error".to_string())
-                   },
-               }
-           },
-           _ => {
-               return Some("could not call function".to_string())
-           }
+        match call_wasm("./plugins/toc/toc.wasm", &root.to_string(), "toc") {
+            Ok(v) => {
+                return Some(v)
+            },
+            Err(e) => {
+                println!("plugin call error: {}", e.to_string());
+                return Some("Plugin error".to_string())
+            },
         }
     }
     println!("no handler for: {}", tag);

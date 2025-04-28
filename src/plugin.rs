@@ -19,15 +19,14 @@ pub fn call_wasm(
 
     let memory = instance
         .get_export(&store, "memory")
-        .and_then(|ext| ext.into_memory())
-        .unwrap();
+        .and_then(|ext| ext.into_memory()).unwrap();
 
     // Loading greet function and passing input as string and receiving output as string.
     let plugin_func: TypedFunc<(u32, u32), u32> =
         instance.get_typed_func(&store, plugin_func).unwrap();
 
     let input_buffer = input.as_bytes();
-    let offset = 0u32;
+    let offset = 40_000;
     memory
         .write(&mut store, offset as usize, input_buffer)
         .unwrap();
