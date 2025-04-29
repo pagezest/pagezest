@@ -1,0 +1,74 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <h2>
+      WASM
+    </h2>
+    <script>
+      const td = new TextDecoder();
+      const te = new TextEncoder();
+      const inputJSON = {"attributes":{},"root":[{"depth":1,"raw":"# This is heading1\n","text":"This is heading1","tokens":[{"escaped":false,"raw":"This is heading1","text":"This is heading1","type":"text"}],"type":"heading"},{"raw":"Contents of Line1\n","text":"Contents of Line1","tokens":[{"escaped":false,"raw":"Contents of Line1","text":"Contents of Line1","type":"text"}],"type":"paragraph"},{"depth":2,"raw":"## This is Heading2\n","text":"This is Heading2","tokens":[{"escaped":false,"raw":"This is Heading2","text":"This is Heading2","type":"text"}],"type":"heading"},{"raw":"Contents of Line2","text":"Contents of Line2","tokens":[{"escaped":false,"raw":"Contents of Line2","text":"Contents of Line2","type":"text"}],"type":"paragraph"},{"raw":"\n\n","type":"space"},{"raw":"[[toc]]\n[[/toc]]","text":"[[toc]]\n[[/toc]]","tokens":[{"escaped":false,"raw":"[[toc]]\n[[/toc]]","text":"[[toc]]\n[[/toc]]","type":"text"}],"type":"paragraph"}],"tag":"toc"};
+      console.log(inputJSON);
+      function readString(ptr) {
+        sz = dv.getUint32(ptr - 4, true);
+        const buff = [];
+        for(let i=0; i<sz; i++) {
+          const v = dv.getUint8(ptr + i);
+          //if(v===0) break;
+          buff.push(v);
+        }
+
+        const buff8 = new Uint8Array(buff);
+        return td.decode(buff8);
+
+      }
+      let wasmBuff, wasm, wasmInstance, wasmModule, dv, dvU8;
+      let res, mallocPtr;
+      const env ={
+        memory: new WebAssembly.Memory({initial: 1}),
+        abort: (msgPtr, filePtr, line, column) => {
+          const decoder = new TextDecoder('utf-8');
+          const msg = decoder.decode(new Uint8Array(env.memory.buffer, msgPtr));
+          console.error(`Abort: ${msg} at ${filePtr}:${line}:${column}`);
+          throw new Error(`Abort: ${msg}`);
+        },
+        'console.log': (a, b) => {
+          console.log('console called', readString(a));
+        },
+      }
+
+      async function init() {
+        wasmBuff = await fetch('./toc.wasm').then(a => a.arrayBuffer());
+        wasm = await WebAssembly.instantiate(wasmBuff, {
+          env,
+        });
+        wasmInstance = wasm.instance;
+        wasmModule = wasm.module;
+
+        const input = JSON.stringify(inputJSON);
+
+
+        dv = new DataView(wasmInstance.exports.memory.buffer);
+        dvU8 = new Uint8Array(wasmInstance.exports.memory.buffer);
+        mallocPtr = wasmInstance.exports.malloc(input.length + 1);
+
+        const ch = [];
+
+
+
+        const inputBuff = te.encode(input);
+        dvU8.set(mallocPtr, inputBuff);
+        for(let i=0; i<inputBuff.length; i++) {
+          dv.setUint8(mallocPtr + i, inputBuff[i]);
+        }
+        dv.setUint8(mallocPtr + input.length, 0);
+        res = wasmInstance.exports.toc(mallocPtr, input.length);
+
+        dvU8 = new Uint8Array(wasmInstance.exports.memory.buffer);
+        console.log(readString(res));
+      }
+      init();
+    </script>
+  </body>
+</html>
