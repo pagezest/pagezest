@@ -1,34 +1,47 @@
 import { JSON } from "json-as";
 
-@json
-class Input {
-    x: i32;
-}
+// Add this to your `entry.ts`
+@external("env", "abort")
+declare function abort(msg: usize, file: usize, line: u32, col: u32): void;
+
+// override abort to do nothing
+function abort(_: usize, __: usize, ___: u32, ____: u32): void {}
 
 export function malloc(sz: usize): usize {
-    return heap.alloc(sz);
+  return heap.alloc(sz);
 }
 
 export function toc(ptr: usize, len: i32): usize {
-    //console.log('start');
-    //const md = "md";
-    // Converting the raw string.
-    const md = String.UTF8.decodeUnsafe(ptr, len, true);
-    //const obj = JSON.parse<JSON.Obj>(md);
-    //
-    //const obj = JSON.parse<JSON.Obj>('{"toc": true}');
-    //const obj = JSON.parse<Input>('{"x": 10}');
+  //return ptr;
+  const md = String.UTF8.decodeUnsafe(ptr, len, true);
+  const obj = JSON.parse<JSON.Obj>(md);
+  let tag: string = '???';
+  if(obj.has('tag')) {
+    tag = obj.get('tag')!.toString();
+  }
+  if(obj.has('root')) {
+    const blocks = obj.get('root')!.get<JSON.Value[]>();
+    console.log(`children length: ${blocks.length}`);
+    for(let i=0; i<blocks.length; i++) {
+      const block = blocks[i];
+      const s = blocks[i].get<string>();
+      console.log(`${s.length}`);
+      //console.log(JSON.stringify(block));
+      //const blockStr = JSON.stringify<JSON.Obj>(block);
+      //console.log(`blockStr: ${blockStr}`);
+      //const type = block.get('type')!.toString();
+      console.log('block');
+    }
+  }
+  console.log(`tag: ${tag}`);
+  const toc = `TOC [tag=${tag}]`;
 
-    //const toc = `###TOC plugin, ptr: ${ptr}, len: ${len}####`;
-    const toc = "X" + md;
-    //const toc = JSON.stringify(obj);
-    const toc_str = String.UTF8.encode(toc, true);
-    //const strBuff = heap.alloc(32);
-    //return strBuff;
-    return changetype<usize>(toc_str);
-    //const numBytes = String.UTF8.encodeUnsafe(toc, 
-    //const output_ptr = heap.alloc(4);
-
-    //return 0;
-    //return output_ptr;
+  const toc_str = String.UTF8.encode(toc, true);
+  return changetype<usize>(toc_str);
+  return ptr;
+  //const obj = new Input("tag!");
+  //const obj = new JSON.Obj();
+  //obj.set('tag', 'tag__');
+  const toc = "hello";
+  return changetype<usize>(toc_str);
 }
