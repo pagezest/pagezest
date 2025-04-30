@@ -13,20 +13,23 @@ pub fn call_wasm(
     let mut store = Store::new(&engine, ());
     let mut linker = Linker::new(&engine);
     let abort_func = Func::wrap(&mut store, abort_stub);
+    let console_log_func = Func::wrap(&mut store, console_log_stub);
     linker.define("env", "abort", abort_func)?;
+    linker.define("env", "console.log", console_log_func)?;
 
     let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
 
     let memory = instance
         .get_export(&store, "memory")
-        .and_then(|ext| ext.into_memory()).unwrap();
+        .and_then(|ext| ext.into_memory())
+        .unwrap();
 
     // Loading greet function and passing input as string and receiving output as string.
     let plugin_func: TypedFunc<(u32, u32), u32> =
-        instance.get_typed_func(&store, plugin_func).unwrap();
+        instance.get_typed_func(&store, plugin_func)?;
 
     let input_buffer = input.as_bytes();
-    let offset = 40_000;
+    let offset = 40_000u32;
     memory
         .write(&mut store, offset as usize, input_buffer)
         .unwrap();
@@ -53,3 +56,6 @@ pub fn call_wasm(
 }
 
 fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {}
+fn console_log_stub(_caller: Caller<'_, ()>, _msg_ptr: i32) {
+    println!("console.log called");
+}
