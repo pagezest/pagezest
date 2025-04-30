@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -e
+set -x
+
+
 tag=
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -18,7 +22,8 @@ echo "tag => $tag"
 
 export LLVM_LIB_CFG_PATH=${LLVM_LIB_CFG_PATH:-/usr/lib/llvm-16/lib}
 cargo build --release
-cp target/release/pagezest docker
+rm -rf ./docker/pagezest
+cp target/release/pagezest ./docker/
 
 pushd admin
 npm run build
@@ -27,11 +32,13 @@ popd
 rm -rf docker/pz-admin/
 cp -r admin/dist/ docker/pz-admin/
 
-cp plugins/*.wasm docker/plugins/
-cp plugins/*.json docker/plugins/
 
-docker build -t pagezest docker
+mkdir -p docker/plugins/toc
+cp plugins/toc/*.{wasm,json} docker/plugins/toc
+
+
+docker build -t pagezest/pagezest docker
 
 docker push pagezest/pagezest
-docker image tag pagezest/pagezest pagezest/pagezest:v0.1
+docker image tag pagezest/pagezest pagezest/pagezest:v0.3
 docker image push --all-tags pagezest/pagezest
