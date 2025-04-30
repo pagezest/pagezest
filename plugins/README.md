@@ -1,20 +1,19 @@
 # Generate Plugins
 
-## Step-1 : Make sure you have AssemblyScript Installed.
+Any language that supports WebAssembly output should work.
 
+## plugins directory structure:
+Each plugin has its own directory that contains `manifest.json` and `<plugin>.wasm`
+
+## manifest.json structure:
+
+```json
+{
+  "manifest_version": "1.0",
+  "version": "1.0",
+  "name": "toc",
+  "tag": "toc",
+  "wasm_path": "toc.wasm",
+  "func_name": "toc"
+}
 ```
-npm i assemblyscript
-```
-
-## Step-2 : Write TS Plugin file
-
-Write your core plugin code in assemblyscript (typescript .ts) file for example `toc.ts`
-
-## Step-3 : Compile the plugin with assemblyscript
-
-```
-npx asc toc.ts --target release --exportRuntime --exportTable --outFile toc.wasm
-```
-
-Load and test your .wasm file.
-

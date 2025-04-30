@@ -1,7 +1,0 @@
-{
-  "dependencies": {
-    "assemblyscript": "^0.27.36",
-    "assemblyscript-json": "^1.1.0",
-    "json-as": "^1.0.4"
-  }
-}
