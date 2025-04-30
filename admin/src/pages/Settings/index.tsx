@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useParams } from "react-router-dom";
 import {
   Tabs,
 } from "@mantine/core";
@@ -11,9 +11,14 @@ import ThemeSettings from "./ThemeSettings";
 export default function Settings() {
   const params = useParams();
   const [page, setPage] = useState(params.page || 'site_settings');
+  const location = useLocation();
+
+  useEffect(() => {
+    if(params.page) setPage(params.page);
+  }, [params.page]);
 
   return (
-    <Tabs value={page} onChange={setPage}>
+    <Tabs value={page} onChange={s => setPage(s as string)} color="indigo" variant="pills">
       <Tabs.List>
         <Tabs.Tab value="site_settings" leftSection={<SettingsIcon />}>
           Site Settings
