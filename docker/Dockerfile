@@ -6,7 +6,12 @@ FROM base AS app
 WORKDIR /app
 
 COPY ./pagezest /app/pagezest
+
+FROM app AS plugins
+
 COPY ./plugins/ /app/plugins
+
+FROM plugins AS admin
 COPY ./pz-admin/ /app/pz-admin
 
 CMD ["./pagezest"]
