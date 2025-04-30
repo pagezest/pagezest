@@ -27,12 +27,11 @@ test_backend() {
 # NOTE: for now, this compiles ONLY the toc (table of contents) plugin
 test_plugins() {
   mkdir -p $TOP/build/plugins/
-  cd $TOP/plugins/
-  npm install
-  npx asc toc/toc.ts --target release --exportRuntime --exportTable --outFile toc/toc.wasm
-  cp $TOP/plugins/page.json $TOP/build/plugins/page.json
-  rm -rf $TOP/build/plugins/toc/
-  cp -r $TOP/plugins/toc/ $TOP/build/plugins/toc/
+  cd $TOP/plugins/toc
+  zig build -p . --prefix-exe-dir .
+  rm -rf $TOP/build/plugins/toc/*
+  cp -r $TOP/plugins/toc/manifest.json $TOP/build/plugins/toc/
+  cp -r $TOP/plugins/toc/toc.wasm $TOP/build/plugins/toc/
 
   # This last cp is purely if you want to test the wasm in the browser.
   # cp -r $TOP/plugins/toc/toc.wasm $TOP/tests/test_wasm/test.wasm
