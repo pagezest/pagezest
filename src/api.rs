@@ -1,4 +1,5 @@
 use rusqlite::Connection;
+use rust_embed::Embed;
 use serde_json::{ Value, json };
 use std::{ error::Error, fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
 use tiny_http::{ Header, Method, Request, Response };
@@ -10,6 +11,10 @@ pub enum ResponseType {
     Html(String),
     Binary(Vec<u8>, String), // data, mimeType
 }
+
+#[derive(Embed)]
+#[folder = "admin/dist/"]
+struct Asset;
 
 pub fn route_request(
     method: &Method,
@@ -46,7 +51,7 @@ fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, plugin_manager: &Arc<Mutex<Pl
                     )
                 })?;
             let md_content_str = md_content.to_string();
-            render_page("plugins/page.json", plugin_manager, &md_content_str)
+            render_page(plugin_manager, &md_content_str)
         }
         None => Err(AppError::PageNotFound(format!("No post found for slug: {}", slug))),
     }
@@ -61,75 +66,11 @@ fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTyp
     }
 }
 
-fn render_page(manifest: &str, plugin_manager: &Arc<Mutex<PluginManager>>, content: &str) -> Result<ResponseType, AppError> {
-    let manifest = std::fs::read(manifest).unwrap();
-    let manifest_json: Value = serde_json
-        ::from_slice(&manifest)
-        .map_err(|e| AppError::ServerError(format!("Failed to parse manifest JSON: {}", e)))?;
-
-    let order = manifest_json
-        .get("order")
-        .and_then(|o| o.as_array())
-        .ok_or_else(|| {
-            AppError::ServerError("Missing or invalid 'order' field in manifest".to_string())
-        })?
-        .iter()
-        .filter_map(|v| v.as_str().map(String::from))
-        .collect::<Vec<String>>();
-
-    //let mut plugin_manager = &plugin_manager.lock().unwrap();
+fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, content: &str) -> Result<ResponseType, AppError> {
     let content_json: Value = serde_json::from_str(content).unwrap();
 
     let mut page_contents = String::new();
     let plugin_manager = plugin_manager.lock().unwrap();
-    /*
-    for val in order {
-        if val == "toc" {
-            let toc_response = call_wasm("plugins/page.wasm", content, "toc").unwrap();
-            let toc_json: Value = serde_json
-                ::from_str(&toc_response)
-                .map_err(|e| AppError::ServerError(format!("Failed to parse TOC JSON: {}", e)))?;
-
-            let success = toc_json
-                .get("success")
-                .and_then(|s| s.as_bool())
-                .ok_or_else(|| {
-                    AppError::ServerError(
-                        "Missing or invalid 'success' field in TOC response".to_string()
-                    )
-                })?;
-
-            if !success {
-                return Err(AppError::ServerError("TOC generation failed".to_string()));
-            }
-            let toc_html = toc_json
-                .get("html")
-                .and_then(|h| h.as_str())
-                .ok_or_else(|| {
-                    AppError::ServerError(
-                        "Missing or invalid 'html' field in TOC response".to_string()
-                    )
-                })?;
-            page_contents.push_str(&format!("{}\n", toc_html));
-        }
-        else if plugin_manager.has_plugin_handler(&val) {
-            let plugin = plugin_manager.get_plugin_by_tag(&val).unwrap();
-            match plugin.borrow_mut().call(content) {
-                Ok(resp) => {
-                    page_contents.push_str(&resp);
-                },
-                Err(e) => {
-                    let s = format!("Error with {}\n{}", val, e.to_string());
-                    page_contents.push_str(&s);
-                },
-            }
-        }
-        else {
-            let s = format!("No handler for {}", val);
-            page_contents.push_str(&s);
-        }
-    }
-    */
     match json_to_html(content, plugin_manager) {
         Ok(s) => {
             page_contents.push_str(&s);
@@ -287,7 +228,7 @@ pub fn get_table_of_contents(request: &mut Request) -> Result<ResponseType, AppE
     Ok(ResponseType::Html(toc_html))
 }
 
-fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
+fn serve_static_fs(request: &mut Request) -> Result<ResponseType, AppError> {
     let static_serve_path = "pz-admin/";
     let path = request.url().trim_start_matches("/pz-admin").trim_start_matches('/');
     let file_path = Path::new(static_serve_path).join(path);
@@ -309,6 +250,29 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
     if file_path.exists() {
         let content = fs::read(&file_path).unwrap();
         return Ok(ResponseType::Binary(content, get_mime_type(file_extension).to_string()))
+    }
+    Err(AppError::PageNotFound("not found".to_string()))
+}
+
+fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
+    let path = request.url().trim_start_matches("/pz-admin").trim_start_matches('/');
+    let mut file_path = Path::new(path);
+
+    let file_exists = match Asset::get(file_path.to_str().unwrap()) {
+        Some(_) => true,
+        None => false
+    };
+
+    if !file_exists {
+        file_path = Path::new("index.html");
+    }
+    let file_extension = file_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("txt");
+    if let Some(content) = Asset::get(file_path.to_str().unwrap()) {
+        let content = std::str::from_utf8(&content.data.clone()).unwrap().to_string();
+        return Ok(ResponseType::Binary(content.as_bytes().to_vec(), get_mime_type(file_extension).to_string()))
     }
     Err(AppError::PageNotFound("not found".to_string()))
 }
