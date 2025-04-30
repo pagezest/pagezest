@@ -36,7 +36,7 @@ export fn toc(ptr: [*]const u8, len: usize) [*:0]const u8 {
     for (children.items) |c| {
         const typ = c.object.get("type").?.string;
         const depth = c.object.get("depth").?.integer;
-        if (std.mem.eql(u8, typ, "heading") and depth >= 0) {
+        if (std.mem.eql(u8, typ, "heading") and depth == 1) {
             const text = c.object.get("text").?.string;
             offset = append_to_str(&return_buffer, offset, "<li>");
             offset = append_to_str(&return_buffer, offset, text);
