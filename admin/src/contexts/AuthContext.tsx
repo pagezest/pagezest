@@ -1,19 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { getCurrentUser, login as apiLogin, logout as apiLogout } from '../api/auth';
+import { getUsers, deleteUser as apiDeleteUser } from '@/api/users';
 
 interface AuthContextType {
   user: User | null;
+  users: User[];
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteUser: () => Promise<void>;
+  listUsers: () => Promise<User[]>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,8 +57,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const listUsers = async () => {
+    console.log('listUsers');
+    try {
+      const users = await getUsers();
+      setUsers(users || []);
+      console.log('listUsers', users);
+      return users;
+    } catch (e) {
+      const err = e as Error;
+      setError(`Failed to get users: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = async (id: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      await apiDeleteUser(id);
+    } catch (err) {
+      setError('Logout failed');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, error, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, error, login, logout, listUsers, deleteUser, users, }}>
       {children}
     </AuthContext.Provider>
   );
