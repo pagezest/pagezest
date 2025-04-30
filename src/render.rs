@@ -16,6 +16,8 @@ enum InlineToken {
   Strong { tokens: Vec<InlineToken> },
   #[serde(rename = "em")]
   Em { tokens: Vec<InlineToken> },
+  #[serde(rename = "del")]
+  Strikethrough { tokens: Vec<InlineToken> },
   #[serde(rename = "codespan")]
   Codespan { text: String },
   #[serde(rename = "link")]
@@ -182,6 +184,7 @@ fn render_inlines(tokens: &[InlineToken]) -> String {
     match token {
       InlineToken::Text { text } => html_escape(text),
       InlineToken::Strong { tokens } => format!("<strong>{}</strong>", render_inlines(tokens)),
+      InlineToken::Strikethrough { tokens } => format!("<del>{}</del>", render_inlines(tokens)),
       InlineToken::Em { tokens } => format!("<em>{}</em>", render_inlines(tokens)),
       InlineToken::Codespan { text } => format!("<code>{}</code>", html_escape(text)),
       InlineToken::Link { href, title, tokens } => {
