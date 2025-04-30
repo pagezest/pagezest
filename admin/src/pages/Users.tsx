@@ -1,16 +1,16 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { Table, Button, Group, Text, LoadingOverlay } from '@mantine/core';
 import { Plus, Edit, Trash } from 'lucide-react';
-import { usePosts } from '@/contexts/PostsContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
 export function Users() {
-  const { posts, loading, error, fetchPosts, deletePost } = usePosts();
+  const { listUsers, deleteUser, users, loading, error, } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    listUsers();
+  }, []);
 
   if (error) {
     return <Text color="red">{error}</Text>;
@@ -24,7 +24,7 @@ export function Users() {
         <h1 className="text-2xl font-bold">Users</h1>
         <Button
           leftSection={<Plus size={20} />}
-          onClick={() => navigate('/posts/new')}
+          onClick={() => navigate('/users/new')}
         >
           New User
         </Button>
@@ -40,17 +40,17 @@ export function Users() {
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
-          {posts.map((post) => (
-            <Table.Tr key={post.id}>
-              <Table.Td>{post.title}</Table.Td>
-              <Table.Td>{post.author}</Table.Td>
-              <Table.Td>{new Date(post.createdAt).toLocaleDateString()}</Table.Td>
+          {users.map((user) => (
+            <Table.Tr key={user.id}>
+              <Table.Td>{user.name}</Table.Td>
+              <Table.Td>{user.role}</Table.Td>
+              <Table.Td>{new Date(user.createdAt).toLocaleDateString()}</Table.Td>
               <Table.Td>
                 <Group gap="xs">
                   <Button
                     variant="light"
                     size="xs"
-                    onClick={() => navigate(`/posts/${post.id}/edit`)}
+                    onClick={() => navigate(`/users/${user.id}/edit`)}
                   >
                     <Edit size={16} />
                   </Button>
@@ -58,7 +58,7 @@ export function Users() {
                     color="red"
                     variant="light"
                     size="xs"
-                    onClick={() => deletePost(post.id)}
+                    onClick={() => deleteUser(user.id)}
                   >
                     <Trash size={16} />
                   </Button>
