@@ -33,6 +33,7 @@ pub fn get_all_post(conn: &Connection) -> Result<Vec<Value>> {
     let fetch_all_post_query = r#"
         SELECT id, slug, title, created_at, updated_at
         FROM posts
+        ORDER BY created_at DESC
     "#;
 
     let mut stmt = conn.prepare(fetch_all_post_query)?;
@@ -143,4 +144,19 @@ pub fn delete_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result
     };
     conn.execute(delete_post_query, [identifier])?;
     Ok(())
+}
+
+pub fn get_stats(conn: &Connection) -> Result<Value> {
+    let fetch_all_post_query = r#"
+        SELECT COUNT(*) AS num_posts
+        FROM posts
+    "#;
+
+    let mut stmt = conn.prepare(fetch_all_post_query)?;
+    stmt.query_row([], |row| {
+        let num_posts: i32 = row.get(0)?;
+        Ok(json!({
+            "num_posts": num_posts,
+        }))
+    })
 }

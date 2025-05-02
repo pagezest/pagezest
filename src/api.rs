@@ -4,7 +4,7 @@ use serde_json::{ Value, json };
 use std::{ error::Error, fs, io::Cursor, path::Path, sync::{ Arc, Mutex } };
 use tiny_http::{ Header, Method, Request, Response };
 
-use crate::{ db, errors::AppError, mime::get_mime_type, plugin::call_wasm, plugin_manager::{Plugin, PluginManager}, post::BlogPost, render::json_to_html };
+use crate::{ db, errors::AppError, memory::get_process_memory, mime::get_mime_type, plugin::call_wasm, plugin_manager::{Plugin, PluginManager}, post::BlogPost, render::json_to_html };
 
 pub enum ResponseType {
     Json(Value),
@@ -26,6 +26,7 @@ pub fn route_request(
     match (method, path) {
         (_, p) if p.starts_with("/pz-admin") => serve_static(request),
         (&Method::Get, p) if p.starts_with("/api/blog/") => find_blog_by_id(conn, p),
+        (&Method::Get, "/api/stats") => get_server_stats(conn),
         (&Method::Get, "/api/blogs") => get_all_blog_posts(conn),
         (&Method::Post, "/api/blog/new") => create_new_blog_post(conn, request),
         (&Method::Post, "/api/blog/update") => update_blog_post(conn, request),
@@ -42,7 +43,7 @@ fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, plugin_manager: &Arc<Mutex<Pl
     let post = db::get_post(&conn.lock().unwrap(), slug, true)?;
     match post {
         Some(post) => {
-            let md_json: Value = post.content;
+            let md_json: Value = post.content.clone();
             let md_content = md_json
                 .get("json")
                 .ok_or_else(|| {
@@ -51,7 +52,7 @@ fn get_post_by_slug(conn: &Arc<Mutex<Connection>>, plugin_manager: &Arc<Mutex<Pl
                     )
                 })?;
             let md_content_str = md_content.to_string();
-            render_page(plugin_manager, &md_content_str)
+            render_page(plugin_manager, &post, &md_content_str, &conn)
         }
         None => Err(AppError::PageNotFound(format!("No post found for slug: {}", slug))),
     }
@@ -66,12 +67,12 @@ fn find_blog_by_id(conn: &Arc<Mutex<Connection>>, p: &str) -> Result<ResponseTyp
     }
 }
 
-fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, content: &str) -> Result<ResponseType, AppError> {
+fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &str, conn: &Arc<Mutex<Connection>>) -> Result<ResponseType, AppError> {
     let content_json: Value = serde_json::from_str(content).unwrap();
 
     let mut page_contents = String::new();
     let plugin_manager = plugin_manager.lock().unwrap();
-    match json_to_html(content, plugin_manager) {
+    match json_to_html(post, content, conn, plugin_manager) {
         Ok(s) => {
             page_contents.push_str(&s);
             return Ok(ResponseType::Html(page_contents));
@@ -275,6 +276,13 @@ fn serve_static(request: &mut Request) -> Result<ResponseType, AppError> {
         return Ok(ResponseType::Binary(content.as_bytes().to_vec(), get_mime_type(file_extension).to_string()))
     }
     Err(AppError::PageNotFound("not found".to_string()))
+}
+
+fn get_server_stats(conn: &Arc<Mutex<Connection>>) -> Result<ResponseType, AppError> {
+    let mut stats = db::get_stats(&conn.lock().unwrap())?;
+    let memory = get_process_memory();
+    stats["memory"] = json!(memory);
+    Ok(ResponseType::Json(json!({"data" : stats, "success": true})))
 }
 
 fn not_implemented_error(request: &mut Request) -> Result<ResponseType, AppError> {
