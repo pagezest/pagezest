@@ -15,6 +15,10 @@ export default function ThemeSettings() {
     fetchThemes();
   }, []);
 
+  if(true) return (<h1>
+    Work in progress
+  </h1>);
+
   async function fetchThemes() {
     try {
       const themes = await getThemes();

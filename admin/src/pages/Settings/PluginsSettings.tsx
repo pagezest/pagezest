@@ -16,6 +16,10 @@ export default function PluginsSettings() {
     fetchPlugins();
   }, []);
 
+  if(true) return (<h1>
+    Work in progress
+  </h1>);
+
   async function fetchPlugins() {
     try {
       const plugins = await getPlugins();

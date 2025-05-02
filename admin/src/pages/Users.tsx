@@ -12,6 +12,10 @@ export function Users() {
     listUsers();
   }, []);
 
+  if(true) return (<h1>
+    Work in progress
+  </h1>);
+
   if (error) {
     return <Text color="red">{error}</Text>;
   }
