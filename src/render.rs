@@ -1,9 +1,10 @@
-use std::{collections::HashMap, sync::MutexGuard};
+use std::{collections::HashMap, sync::{Arc, Mutex, MutexGuard}};
 
+use rusqlite::Connection;
 use serde::{ser, Deserialize};
 use serde_json::{json, Value};
 
-use crate::plugin_manager::PluginManager;
+use crate::{db, plugin_manager::PluginManager, post::BlogPost};
 
 const STYLE: &str = include_str!("../assets/milligram.min.css");
 
@@ -11,7 +12,7 @@ const STYLE: &str = include_str!("../assets/milligram.min.css");
 #[serde(tag = "type")]
 enum InlineToken {
   #[serde(rename = "text")]
-  Text { text: String },
+  Text { text: String, tokens: Option<Vec<InlineToken>> },
   #[serde(rename = "strong")]
   Strong { tokens: Vec<InlineToken> },
   #[serde(rename = "em")]
@@ -20,6 +21,8 @@ enum InlineToken {
   Strikethrough { tokens: Vec<InlineToken> },
   #[serde(rename = "codespan")]
   Codespan { text: String },
+  #[serde(rename = "image")]
+  Image { href: String, title: Option<String>},
   #[serde(rename = "link")]
   Link { href: String, title: Option<String>, tokens: Vec<InlineToken> },
   #[serde(other)]
@@ -50,6 +53,8 @@ enum Block {
   #[serde(rename = "list_item")]
   ListItem {
     text: String,
+    task: Option<bool>,
+    checked: Option<bool>,
     tokens: Vec<InlineToken>,
   },
   #[serde(rename = "code")]
@@ -80,6 +85,8 @@ enum Block {
 pub struct ListItem {
   text: String,
   tokens: Vec<InlineToken>,
+  task: Option<bool>,
+  checked: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -92,12 +99,14 @@ pub struct TableRow {
   cells: Vec<TableCell>,
 }
 
-pub fn json_to_html(json_input: &str, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
+pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Arc<Mutex<Connection>>, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
   let root: Value = serde_json::from_str(json_input).unwrap();
   let blocks: Vec<Block> = serde_json::from_str(json_input)?;
   let mut html = String::new();
   html.push_str("<html>");
   html.push_str("<head>");
+  html.push_str("<meta charset=\"utf-8\"/>");
+  html.push_str(&format!("<title>{}</title>", html_escape(&post.title)));
 
   html.push_str("<style>");
   html.push_str(STYLE);
@@ -105,7 +114,7 @@ pub fn json_to_html(json_input: &str, mut plugin_manager: MutexGuard<'_, PluginM
   html.push_str("</head>");
   html.push_str("<body>");
   for block in blocks {
-    html.push_str(&render_block(&block, &root, &mut plugin_manager));
+    html.push_str(&render_block(&block, &root, conn, &mut plugin_manager));
   }
 
   html.push_str("</body>");
@@ -113,18 +122,18 @@ pub fn json_to_html(json_input: &str, mut plugin_manager: MutexGuard<'_, PluginM
   Ok(html.to_string())
 }
 
-fn render_block(block: &Block, root: &Value, plugin_manager: &mut PluginManager) -> String {
+fn render_block(block: &Block, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager) -> String {
   match block {
     Block::Space => "\n".to_string(),
     Block::Paragraph { tokens, text } => {
-      if let Some(custom) = try_handle_custom_tag(text, root, plugin_manager) {
+      if let Some(custom) = try_handle_custom_tag(text, root, conn, plugin_manager) {
         custom
       } else {
         format!("<p>{}</p>\n", render_inlines(tokens))
       }
     }
     Block::Heading { depth, tokens, text } => {
-      if let Some(custom) = try_handle_custom_tag(text, root, plugin_manager) {
+      if let Some(custom) = try_handle_custom_tag(text, root, conn, plugin_manager) {
         custom
       } else {
         format!("<h{d}>{}</h{d}>\n", render_inlines(tokens), d = depth)
@@ -133,13 +142,17 @@ fn render_block(block: &Block, root: &Value, plugin_manager: &mut PluginManager)
     Block::List { ordered, items } => {
       let tag = if *ordered { "ol" } else { "ul" };
       let items_html = items.iter()
-        .map(|item| format!("<li>{}</li>", render_inlines(&item.tokens)))
+        .map(|item| render_list_item(item))
         .collect::<Vec<_>>()
         .join("\n");
         format!("<{tag}>\n{items_html}\n</{tag}>\n")
     }
-    Block::ListItem { tokens, .. } => {
-      format!("<li>{}</li>\n", render_inlines(tokens))
+    Block::ListItem { tokens, task, .. } => {
+        if let Some(task) = task {
+            println!("task");
+            return format!("<li><input type=\"checkbox\">{}</li>\n", render_inlines(tokens))
+        }
+        format!("<li>{}</li>\n", render_inlines(tokens))
     }
     Block::Code { text, lang } => {
       if let Some(lang) = lang {
@@ -150,7 +163,7 @@ fn render_block(block: &Block, root: &Value, plugin_manager: &mut PluginManager)
     }
     Block::Blockquote { tokens } => {
       let content = tokens.iter()
-        .map(|x| render_block(x, root, plugin_manager))
+        .map(|x| render_block(x, root, conn, plugin_manager))
         .collect::<Vec<_>>()
         .join("\n");
         format!("<blockquote>\n{}</blockquote>\n", content)
@@ -182,7 +195,15 @@ fn render_block(block: &Block, root: &Value, plugin_manager: &mut PluginManager)
 fn render_inlines(tokens: &[InlineToken]) -> String {
   tokens.iter().map(|token| {
     match token {
-      InlineToken::Text { text } => html_escape(text),
+      //InlineToken::Text { text } => html_escape(text),
+      InlineToken::Text { text, tokens } => match tokens {
+          Some(tokens) => {
+              render_inlines(tokens)
+          },
+          _ => {
+              text.to_string()
+          }
+      },
       InlineToken::Strong { tokens } => format!("<strong>{}</strong>", render_inlines(tokens)),
       InlineToken::Strikethrough { tokens } => format!("<del>{}</del>", render_inlines(tokens)),
       InlineToken::Em { tokens } => format!("<em>{}</em>", render_inlines(tokens)),
@@ -194,9 +215,33 @@ fn render_inlines(tokens: &[InlineToken]) -> String {
           format!("<a href=\"{}\">{}</a>", html_escape(href), render_inlines(tokens))
         }
       }
+      InlineToken::Image { href, title } => {
+        if let Some(title) = title {
+          format!("<img src=\"{}\" title=\"{}\" alt=\"{}\"</>", html_escape(href), html_escape(title), render_inlines(tokens))
+        } else {
+          format!("<img src=\"{}\" />", html_escape(href))
+        }
+      }
       InlineToken::Other => "".to_string(),
     }
   }).collect::<Vec<_>>().join("")
+}
+
+fn render_list_item(item: &ListItem) -> String {
+    let task_input = match item.task {
+        Some(task) => {
+            let checked = item.checked.unwrap_or(false);
+            if task {
+            &format!("<input type=\"checkbox\" {}/>", if checked { "checked" } else {""})
+            } else {
+                ""
+            }
+        },
+        None => {
+            ""
+        }
+    };
+    format!("<li>{}{}</li>", task_input, render_inlines(&item.tokens))
 }
 
 fn html_escape(input: &str) -> String {
@@ -207,7 +252,7 @@ fn html_escape(input: &str) -> String {
     .replace('\'', "&#39;")
 }
 
-fn try_handle_custom_tag(text: &str, root: &Value, plugin_manager: &mut PluginManager) -> Option<String> {
+fn try_handle_custom_tag(text: &str, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager) -> Option<String> {
   let trimmed = text.trim();
   if let Some(start) = trimmed.find("[[") {
     if let Some(end) = trimmed.find("]]") {
@@ -216,7 +261,7 @@ fn try_handle_custom_tag(text: &str, root: &Value, plugin_manager: &mut PluginMa
       let close_tag = format!("[[/{}]]", tag_name);
       if let Some(close_start) = trimmed.find(&close_tag) {
         let content = &trimmed[end + 2..close_start];
-        return Some(handle_custom_tag(&tag_name, content, attributes, root, plugin_manager))?;
+        return Some(handle_custom_tag(&tag_name, content, attributes, root, conn, plugin_manager))?;
       }
     }
   }
@@ -289,10 +334,43 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
   (tag_name, attributes)
 }
 
-fn handle_custom_tag(tag: &str, content: &str, attribs: HashMap<String, String>, root: &Value, plugin_manager: &mut PluginManager) -> Option<String> {
+fn handle_custom_tag(
+    tag: &str, content: &str, attribs: HashMap<String, String>, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager
+    ) -> Option<String> {
   if tag == "custom-html" {
     return Some(content.to_string())
   }
+
+  if tag == "posts" {
+      let mut recent_posts = String::new();
+      recent_posts.push_str("<h1>Recent Posts</h1>");
+      recent_posts.push_str("<ul>");
+      let conn = conn.lock().unwrap();
+      match db::get_all_post(&conn) {
+        Ok(posts) => {
+            for post in posts {
+                let slug = post.get("slug").and_then(|s| s.as_str()).unwrap();
+                let title = post.get("title").and_then(|s| s.as_str()).unwrap();
+                let created_at = post.get("created_at").and_then(|s| s.as_str()).unwrap();
+                if slug == "" {
+                    continue;
+                }
+                recent_posts.push_str(&format!(
+                        "<li><a href='/{}'> {} | {} </a></li>",
+                        html_escape(&slug),
+                        html_escape(&title),
+                        html_escape(&created_at),
+                        ));
+            }
+        },
+        Err(e) => {
+            recent_posts.push_str(&format!("Error getting posts: {}", e.to_string()));
+        }
+      }
+      recent_posts.push_str("</ul>");
+      return Some(recent_posts.to_string());
+  }
+
   let plugin_input = json!({
     "tag": tag,
     "root": root,
@@ -302,7 +380,6 @@ fn handle_custom_tag(tag: &str, content: &str, attribs: HashMap<String, String>,
   if plugin_manager.has_plugin_handler(tag) {
     match plugin_manager.get_plugin_by_tag(tag) {
       Ok(func) => {
-        println!("rendering custom tag: {}", tag);
         match func.borrow_mut().call_in_new_context(&plugin_input.to_string()) {
           Ok(v) => {
             return Some(v)
