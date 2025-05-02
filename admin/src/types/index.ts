@@ -59,3 +59,8 @@ export interface Block {
   type: string;
   settings: Record<string, SettingValue>;
 }
+
+export interface ServerStats {
+  num_posts: number;
+  memory: number;
+}
