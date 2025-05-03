@@ -14,7 +14,7 @@ test_ui() {
 test_backend() {
   cd $TOP
   cargo build --release
-  cp $TOP/target/debug/pagezest $TOP/build/
+  cp $TOP/target/release/pagezest $TOP/build/
   cd $TOP/build/
   rm -rf $TOP/build/pagezest.db
   ./pagezest
