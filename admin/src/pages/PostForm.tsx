@@ -95,7 +95,7 @@ export function PostForm() {
         />
 
         <Textarea
-          label="Content"
+          label="Content (markdown)"
           placeholder="Enter post content"
           required
           minRows={10}
