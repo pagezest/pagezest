@@ -164,10 +164,10 @@ impl Plugin {
         self.memory
             .write(&mut self.store.as_context_mut(), offset as usize, input.as_bytes())
             .unwrap();
-        println!("write memory OK: {}", input.len());
+        //println!("write memory OK: {}", input.len());
         let res_ptr = (&mut self.plugin_func)
             .call(&mut self.store, (offset, input.len() as u32))?;
-        println!("**********reading resp: {}", res_ptr);
+        //println!("**********reading resp: {}", res_ptr);
         let mut output = Vec::new();
         let mut curr_ptr = res_ptr;
         loop {

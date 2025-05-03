@@ -372,14 +372,16 @@ fn handle_custom_tag(
   }
 
   let plugin_input = json!({
-    "tag": tag,
-    "root": root,
-    "attributes": attribs,
+      "content": content,
+      "tag": tag,
+      "root": root,
+      "attributes": attribs,
   });
   
   if plugin_manager.has_plugin_handler(tag) {
     match plugin_manager.get_plugin_by_tag(tag) {
       Ok(func) => {
+          /*
         match func.borrow_mut().call_in_new_context(&plugin_input.to_string()) {
           Ok(v) => {
             return Some(v)
@@ -389,6 +391,17 @@ fn handle_custom_tag(
             return Some("Plugin error".to_string())
           },
         }
+          */
+        match func.borrow_mut().call(&plugin_input.to_string()) {
+          Ok(v) => {
+            return Some(v)
+          },
+          Err(e) => {
+            println!("plugin call error: {}", e.to_string());
+            return Some("Plugin error".to_string())
+          },
+        }
+
       },
       _ => {
         return Some("could not call function".to_string())
