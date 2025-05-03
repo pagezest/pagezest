@@ -26,12 +26,24 @@ test_backend() {
 
 # NOTE: for now, this compiles ONLY the toc (table of contents) plugin
 test_plugins() {
-  mkdir -p $TOP/build/plugins/
+  mkdir -p $TOP/build/plugins/toc
+  mkdir -p $TOP/build/plugins/footer
+
   cd $TOP/plugins/toc
   zig build -p . --prefix-exe-dir .
   rm -rf $TOP/build/plugins/toc/*
   cp -r $TOP/plugins/toc/manifest.json $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc/toc.wasm $TOP/build/plugins/toc/
+
+  cd $TOP/plugins/footer
+  cargo build --release --target wasm32-unknown-unknown
+  #cargo build --target wasm32-wasip2 --release
+  #wasm-pack build --release --no-typescript --no-pack --reference-types --target web
+  #wasm-pack build --release --no-typescript --no-pack --no-opt --target web
+  rm -rf $TOP/build/plugins/footer/*
+  cp -r $TOP/plugins/footer/manifest.json $TOP/build/plugins/footer/
+  #cp -r $TOP/plugins/footer/target/wasm32-wasip2/release/footer.wasm $TOP/build/plugins/footer/footer.wasm
+  cp -r $TOP/plugins/footer/target/wasm32-unknown-unknown/release/footer.wasm $TOP/build/plugins/footer/footer.wasm
 
   # This last cp is purely if you want to test the wasm in the browser.
   # cp -r $TOP/plugins/toc/toc.wasm $TOP/tests/test_wasm/test.wasm
