@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "name": "footer",
+  "tag": "footer",
+  "wasm_path": "footer.wasm",
+  "func_name": "footer"
+}
+
