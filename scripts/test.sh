@@ -9,11 +9,6 @@ test_ui() {
   cd $TOP/admin
   npm install
   npm run build
-  cd $TOP
-  rm -rf $TOP/build/pz-admin/
-  cp -r $TOP/admin/dist/ $TOP/build/pz-admin/
-  cd $TOP/build
-  ./pagezest
 }
 
 test_backend() {
