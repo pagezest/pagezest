@@ -16,6 +16,7 @@ test_backend() {
   cargo build --release
   cp $TOP/target/debug/pagezest $TOP/build/
   cd $TOP/build/
+  rm -rf $TOP/build/pagezest.db
   ./pagezest
 }
 
