@@ -1,17 +1,21 @@
-Setup Rust on your system.
+# How to Compile the Server
 
-Run the server
+Installation Requirements:
+* Rust toolchain (rustc, cargo): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+* Zig (zig): `sudo snap install zig --classic --beta`
+* libsqlite: `apt install libsqlite3-dev`
 
-```
-cargo run --release
-```
+Do steps 1-3. You need all steps working in order for the server to work.
 
-This will start the server on port 8080 [http://localhost:8080](http://localhost:8080)
+1. Compile the UI: `sh scripts/test.sh ui`
+2. Compile the Plugins: `sh scripts/test.sh p`
+3. Compile the Server: `sh scripts/test.sh b`
 
-And try hitting the APIs from given [postman collection](https://api.postman.com/collections/21491030-c6505855-123e-43fd-b9da-629adb7c03e2?access_key=PMAT-01JRKD5J1BKS04ENMDBR825G97)
+# Measuring requests per second of server
 
+Just run Apache Benchmark: `ab -n 1000 -c 40 "http://127.0.0.1:8080/hello-world`
 
-# Load Testing the Server
+# Measuring RSS/RAM usage of server
 
 There is a shell script that tries to call an API for viewing all the blog posts from the DB. 
 
