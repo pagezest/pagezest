@@ -6,7 +6,7 @@ const API_HEADERS = {
 };
 
 export const getPosts = async (): Promise<Post[]> => {
-  return fetch('/api/blogs', {
+  return fetch('/api/blog', {
     headers: {
       ...API_HEADERS,
     },
@@ -28,7 +28,7 @@ export const createPost = async (post: Omit<Post, 'id' | 'created_at' | 'updated
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  return fetch('/api/blog/new', {
+  return fetch('/api/blog', {
     method: 'POST',
     headers: {
       ...API_HEADERS,
@@ -44,8 +44,8 @@ export const updatePost = async (id: string, post: Partial<Post>): Promise<Post>
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
-  return fetch(`/api/blog/update`, {
-    method: 'POST',
+  return fetch(`/api/blog/${id}`, {
+    method: 'PUT',
     headers: {
       ...API_HEADERS,
     },
@@ -54,8 +54,8 @@ export const updatePost = async (id: string, post: Partial<Post>): Promise<Post>
 
 };
 
-export const deletePost = async (id: string): Promise<void> => {
-  return fetch(`/api/blog/delete/${id}`, {
+export const deletePost = async (id: string): Promise<string> => {
+  return fetch(`/api/blog/${id}`, {
     method: 'DELETE',
   }).then(a => a.text());
 };
