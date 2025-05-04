@@ -18,7 +18,7 @@ export function Posts() {
   }
 
   function previewPost(post: Post) {
-    const postUrl = `/api/${post.slug}`;
+    const postUrl = `/api/preview/${post.slug}`;
     window.open(postUrl);
   }
 
