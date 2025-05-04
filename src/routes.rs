@@ -10,7 +10,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     .route("/api/blog/{id}", web::put().to(api::update_blog_post))
     .route("/api/blog/{id}", web::delete().to(api::delete_blog_post))
     .route("/api/blog{trailing:/?}", web::get().to(api::get_all_blog_posts))
-    .route("/api/stats", web::get().to(api::get_server_stats));
+    .route("/api/stats", web::get().to(api::get_server_stats))
+    .service(Files::new("/assets", "./assets").show_files_listing().redirect_to_slash_directory());
     serve_static_cfg(cfg);
     cfg.route("/api/preview/{tail:.*}", web::get().to(api::get_post_by_slug));
     cfg.route("/{tail:.*}", web::get().to(api::get_post_by_slug));
