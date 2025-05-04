@@ -30,9 +30,10 @@ export fn toc(ptr: [*]const u8, len: usize) usize {
     for (children.items) |c| {
         const typ = c.object.get("type").?.string;
         const depth = c.object.get("depth").?.integer;
-        if (depth == 1) {
-            _ = writer.print("<li style='margin-left: {d}px'>", .{depth}) catch null;
-            _ = writer.print("{s}", .{typ}) catch null;
+        if (std.mem.eql(u8, typ, "heading") and depth == 1) {
+            const text = c.object.get("text").?.string;
+            _ = writer.print("<li>", .{}) catch null;
+            _ = writer.print("{s}", .{text}) catch null;
             _ = writer.print("</li>", .{}) catch null;
         }
     }
