@@ -9,6 +9,7 @@ mod plugin_manager;
 mod render;
 mod routes;
 
+use std::env;
 use std::sync::{Arc, Mutex};
 
 use actix_web::{App, HttpServer, web::Data};
@@ -28,9 +29,50 @@ pub struct AppState {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let mut host = "127.0.0.1".to_string();
+    let mut port = 8080;
+    let mut num_workers = num_cpus;
+    let mut debug = false;
 
-    unsafe {std::env::set_var("RUST_LOG", "debug");}
-    env_logger::init();
+    let args: Vec<String> = env::args().collect();
+    let  mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--host" => {
+                if i + 1 < args.len() {
+                    host = args[i + 1].clone();
+                    i += 1;
+                }
+            }
+            "--port" => {
+                if i + 1 < args.len() {
+                    if let Ok(p) = args[i + 1].parse::<u16>() {
+                        port = p;
+                        i += 1;
+                    }
+                }
+            }
+            "--num_workers" => {
+                if i + 1 < args.len() {
+                    if let Ok(n) = args[i + 1].parse::<usize>() {
+                        num_workers = n;
+                        i += 1;
+                    }
+                }
+            }
+            "--debug" => {
+                debug = true;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+
+    if debug {
+        unsafe {std::env::set_var("RUST_LOG", "debug");}
+        env_logger::init();
+    }
 
     let m1 = get_process_memory();
     // Initializing DB for blog posts.
@@ -68,8 +110,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(data)
             .configure(routes::config)
     })
-    .workers(2)
-        .bind(("127.0.0.1", 8080))?
+    .workers(num_workers)
+        .bind((host, port))?
         .run()
         .await
 }
