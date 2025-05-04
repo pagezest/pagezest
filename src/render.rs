@@ -6,7 +6,11 @@ use serde_json::{json, Value};
 
 use crate::{db, plugin_manager::PluginManager, post::BlogPost};
 
-const STYLE: &str = include_str!("../assets/milligram.min.css");
+const STYLE: &str = if cfg!(feature = "embed_styles") {
+    concat!("<style>", include_str!("../assets/milligram.min.css"), "</style>")
+} else {
+    "<link rel=\"stylesheet\" href=\"/assets/milligram.min.css\">"
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -108,9 +112,7 @@ pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Connection, mu
   html.push_str("<meta charset=\"utf-8\"/>");
   html.push_str(&format!("<title>{}</title>", html_escape(&post.title)));
 
-  html.push_str("<style>");
   html.push_str(STYLE);
-  html.push_str("</style>");
   html.push_str("</head>");
   html.push_str("<body>");
   for block in blocks {
