@@ -15,6 +15,7 @@ pub async fn update_blog_post(
   id: web::Path<String>,
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
+  let req_json = req_json.into_inner();
   let conn = app_state.conn.lock().unwrap();
   let id = id.into_inner();
 
@@ -39,7 +40,8 @@ pub async fn update_blog_post(
   if db::get_post(&conn, &id, false)
     .map_err(|e| ErrorInternalServerError(e.to_string()))
       ?.is_some() {
-        db::update_post(&conn, blog_post, &id, false).unwrap();
+        db::update_post(&conn, blog_post, &id, false)
+          .map_err(|e| ErrorInternalServerError(e.to_string()))?;
         return Ok(HttpResponse::Ok().json(
             json!({"msg" : "Updated your Blog Successfully", "success" : true})
         ));
@@ -54,7 +56,8 @@ pub async fn find_blog_by_id(
   app_state: Data<AppState>,
   path: web::Path<String>
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock().unwrap();
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let id = path.into_inner();
   let post = db::get_post(&conn, &id, false)
     .or_else(|_| Err(ErrorNotFound("post not found")))?;
@@ -65,7 +68,9 @@ pub async fn find_blog_by_id(
 pub async fn get_all_blog_posts(
   app_state: Data<AppState>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock().unwrap();
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
   let posts = db::get_all_post(&conn)
     .map_err(|e| ErrorInternalServerError(e.to_string()))?;
     Ok(HttpResponse::Ok().json(json!({"data" : posts, "success": true})))
@@ -75,7 +80,10 @@ pub async fn create_new_blog_post(
   app_state: Data<AppState>,
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock().unwrap();
+  let req_json = req_json.into_inner();
+  println!("post: {:?}", req_json);
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let slug = req_json.get("slug")
     .and_then(|v| v.as_str())
     .ok_or_else(|| ErrorInternalServerError(""))?;
@@ -91,8 +99,9 @@ pub async fn create_new_blog_post(
   let blog_post: BlogPost = BlogPost::new(slug, title, content);
 
   // Check if Blog with given slug already exists or not.
-  let post = db::get_post(&conn, &blog_post.slug, true);
-  if post.is_ok() {
+  let post = db::get_post(&conn, &blog_post.slug, true)
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+  if post.is_some() {
     return Err(ErrorBadRequest("slug already exists"));
   }
 
@@ -102,16 +111,18 @@ pub async fn create_new_blog_post(
 }
 
 pub async fn delete_blog_post(
-  conn: web::Data<Mutex<Connection>>,
+  app_state: Data<AppState>,
   path: web::Path<String>
 ) -> Result<impl Responder> {
   let id = path.into_inner();
-  let conn = conn.lock().unwrap();
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
   // Check if a blog with the given ID exists.
   _ = db::get_post(&conn, &id, false)
     .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    db::delete_post(&conn, &id, false).unwrap();
+    db::delete_post(&conn, &id, false)
+      .map_err(|e| ErrorInternalServerError(e.to_string()))?;
     Ok(HttpResponse::Ok().json(json!({"msg": "Blog deleted successfully", "success": true})))
 }
 
@@ -119,11 +130,13 @@ pub async fn delete_blog_post(
 pub async fn get_server_stats(
   app_state: Data<AppState>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock().unwrap();
-  let mut stats = db::get_stats(&conn).unwrap();
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+  let mut stats = db::get_stats(&conn)
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let memory = get_process_memory();
   stats["memory"] = json!(memory);
-  Ok(HttpResponse::Ok().body("OK"))
+  Ok(HttpResponse::Ok().json(json!({"data": stats})))
 }
 
 pub async fn get_post_by_slug(
@@ -134,12 +147,17 @@ pub async fn get_post_by_slug(
     Some(path) => path.into_inner(),
     None => "".to_string(),
   };
-  let conn = app_state.conn.lock().unwrap();
+  let conn = app_state.conn.lock()
+    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let plugin_manager = app_state.plugin_manager.clone();
   let post = db::get_post(&conn, &slug, true)
     .map_err(|_e| ErrorNotFound("post not found"))
-    .or_else(|_| Err(ErrorNotFound("post not found")))?
-    .unwrap();
+    .or_else(|_| Err(ErrorNotFound("post not found")))?;
+
+  if post.is_none() {
+    return Err(ErrorNotFound("Post not found"));
+  }
+  let post = post.unwrap();
 
   let md_json: Value = post.content.clone();
   let md_content = md_json
@@ -157,7 +175,7 @@ pub async fn get_post_by_slug(
 }
 
 fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &str, conn: &Connection) -> Result<String, std::io::Error> {
-  let content_json: Value = serde_json::from_str(content).unwrap();
+  let content_json: Value = serde_json::from_str(content)?;
 
   let mut page_contents = String::new();
   let plugin_manager = plugin_manager.lock().unwrap();
@@ -172,7 +190,7 @@ fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, cont
 
   }
   page_contents.push_str("<pre>");
-  page_contents.push_str(&serde_json::to_string_pretty(&content_json).unwrap());
+  page_contents.push_str(&serde_json::to_string_pretty(&content_json)?);
   page_contents.push_str("</pre>");
   Ok(page_contents)
 }
