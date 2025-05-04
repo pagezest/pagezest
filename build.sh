@@ -31,8 +31,8 @@ popd
 
 rm -rf docker/pz-admin/
 cp -r admin/dist/ docker/pz-admin/
-rm -rf docker/assets
-cp -r admin/dist/ docker/assets
+rm -rf docker/assets/
+cp -r assets/ docker/assets
 
 
 mkdir -p docker/plugins/toc
