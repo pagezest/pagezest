@@ -30,7 +30,7 @@ pub struct AppState {
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-    let mut host = "127.0.0.1".to_string();
+    let mut host = "0.0.0.0".to_string();
     let mut port = 8080;
     let mut num_workers = num_cpus;
     let mut debug = false;
