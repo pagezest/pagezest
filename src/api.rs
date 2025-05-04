@@ -1,4 +1,4 @@
-use actix_web::{error::{ErrorBadRequest, ErrorInternalServerError, ErrorNotFound,}, web::{self, Data}, HttpResponse, Responder, Result};
+use actix_web::{error::{ErrorBadRequest, ErrorInternalServerError, ErrorNotFound,}, web::{self, Data}, HttpRequest, HttpResponse, Responder, Result};
 use rusqlite::Connection;
 use rust_embed::Embed;
 use serde_json::{ Value, json };
@@ -193,5 +193,19 @@ fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, cont
   page_contents.push_str(&serde_json::to_string_pretty(&content_json)?);
   page_contents.push_str("</pre>");
   Ok(page_contents)
+}
+
+pub async fn serve_embedded(req: HttpRequest) -> impl Responder {
+  let path = req.match_info().query("tail").trim_start_matches('/');
+  let path = if path.is_empty() { "index.html" } else { path };
+
+  match Asset::get(path) {
+    Some(content) => {
+      let body = actix_web::body::BoxBody::new(content.data.to_vec());
+      let mime = mime_guess::from_path(path).first_or_octet_stream();
+      HttpResponse::Ok().content_type(mime.as_ref()).body(body)
+    }
+    None => HttpResponse::NotFound().body("Not Found"),
+  }
 }
 
