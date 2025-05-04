@@ -17,6 +17,9 @@ export fn toc(ptr: [*]const u8, len: usize) usize {
 
     const obj = inputObj.object;
     const root = obj.get("root") orelse return @intFromPtr("no root".ptr);
+    const title_val = obj.get("content") orelse std.json.Value{ .string = "" };
+    const title_trimmed = std.mem.trim(u8, title_val.string, " \t\n\r");
+    const title = if (title_trimmed.len == 0) "Table of contents" else title_trimmed;
 
     if (root != .array)
         return @intFromPtr("not a array");
@@ -25,7 +28,7 @@ export fn toc(ptr: [*]const u8, len: usize) usize {
 
     var output = std.ArrayList(u8).init(allocator);
     var writer = output.writer();
-    _ = writer.print("<h1>TOC</h1>", .{}) catch null;
+    _ = writer.print("<h1>{s}</h1>", .{title}) catch null;
     _ = writer.print("<ul>", .{}) catch null;
     for (children.items) |c| {
         const typ = c.object.get("type").?.string;
