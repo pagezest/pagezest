@@ -17,7 +17,7 @@ test_backend() {
   cp $TOP/target/release/pagezest $TOP/build/
   cd $TOP/build/
   rm -rf $TOP/build/pagezest.db
-  ./pagezest
+  ./pagezest --host 0.0.0.0 --num_workers 4
 }
 
 # NOTE: for now, this compiles ONLY the toc (table of contents) plugin
