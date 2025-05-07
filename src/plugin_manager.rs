@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, env, error::Error, fs, path::{Path, PathBuf}, rc::Rc};
+use std::{collections::HashMap, env, error::Error, fs, path::{Path, PathBuf}, sync::{Arc, Mutex}};
 
 use serde_json::Value;
 use wasmi::{AsContextMut, Caller, Config, Engine, Func, Instance, Linker, Memory, Module, Store, TypedFunc};
@@ -19,7 +19,7 @@ pub struct Plugin {
 
 #[derive(Debug)]
 pub struct PluginManager {
-    plugins: HashMap<String, Rc<RefCell<Plugin>>>
+    plugins: HashMap<String, Arc<Mutex<Plugin>>>
 }
 
 impl PluginManager {
@@ -29,7 +29,7 @@ impl PluginManager {
 
    pub fn load_plugin(&mut self, plugin: Plugin) {
        //let plugin = Plugin::new(name, tag);
-       self.plugins.insert(plugin.tag.to_string(), Rc::new(RefCell::new(plugin)));
+       self.plugins.insert(plugin.tag.to_string(), Arc::new(Mutex::new(plugin)));
    }
 
    pub fn unload_plugin(&mut self, tag: &str) {
@@ -44,7 +44,7 @@ impl PluginManager {
        self.plugins.contains_key(tag)
    }
 
-   pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Rc<RefCell<Plugin>>, AppError> {
+   pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Arc<Mutex<Plugin>>, AppError> {
        match self.plugins.get(tag) {
            Some(plugin) => {
                Ok(plugin)

@@ -21,7 +21,7 @@ done
 echo "tag => $tag"
 
 export LLVM_LIB_CFG_PATH=${LLVM_LIB_CFG_PATH:-/usr/lib/llvm-16/lib}
-cargo build --release
+cargo build --release --no-default-features
 rm -rf ./docker/pagezest
 cp target/release/pagezest ./docker/
 
@@ -31,6 +31,8 @@ popd
 
 rm -rf docker/pz-admin/
 cp -r admin/dist/ docker/pz-admin/
+rm -rf docker/assets/
+cp -r assets/ docker/assets
 
 
 mkdir -p docker/plugins/toc
@@ -40,5 +42,5 @@ cp plugins/toc/*.{wasm,json} docker/plugins/toc
 docker build -t pagezest/pagezest docker
 
 docker push pagezest/pagezest
-docker image tag pagezest/pagezest pagezest/pagezest:v0.3
+docker image tag pagezest/pagezest pagezest/pagezest:v0.4
 docker image push --all-tags pagezest/pagezest

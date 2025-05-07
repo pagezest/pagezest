@@ -6,7 +6,11 @@ use serde_json::{json, Value};
 
 use crate::{db, plugin_manager::PluginManager, post::BlogPost};
 
-const STYLE: &str = include_str!("../assets/milligram.min.css");
+const STYLE: &str = if cfg!(feature = "embed_styles") {
+    concat!("<style>", include_str!("../assets/milligram.min.css"), "</style>")
+} else {
+    "<link rel=\"stylesheet\" href=\"/assets/milligram.min.css\">"
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
@@ -99,7 +103,7 @@ pub struct TableRow {
   cells: Vec<TableCell>,
 }
 
-pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Arc<Mutex<Connection>>, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
+pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
   let root: Value = serde_json::from_str(json_input).unwrap();
   let blocks: Vec<Block> = serde_json::from_str(json_input)?;
   let mut html = String::new();
@@ -108,9 +112,7 @@ pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Arc<Mutex<Conn
   html.push_str("<meta charset=\"utf-8\"/>");
   html.push_str(&format!("<title>{}</title>", html_escape(&post.title)));
 
-  html.push_str("<style>");
   html.push_str(STYLE);
-  html.push_str("</style>");
   html.push_str("</head>");
   html.push_str("<body>");
   for block in blocks {
@@ -122,7 +124,7 @@ pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Arc<Mutex<Conn
   Ok(html.to_string())
 }
 
-fn render_block(block: &Block, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager) -> String {
+fn render_block(block: &Block, root: &Value, conn: &Connection, plugin_manager: &mut PluginManager) -> String {
   match block {
     Block::Space => "\n".to_string(),
     Block::Paragraph { tokens, text } => {
@@ -252,7 +254,7 @@ fn html_escape(input: &str) -> String {
     .replace('\'', "&#39;")
 }
 
-fn try_handle_custom_tag(text: &str, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager) -> Option<String> {
+fn try_handle_custom_tag(text: &str, root: &Value, conn: &Connection, plugin_manager: &mut PluginManager) -> Option<String> {
   let trimmed = text.trim();
   if let Some(start) = trimmed.find("[[") {
     if let Some(end) = trimmed.find("]]") {
@@ -335,7 +337,7 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
 }
 
 fn handle_custom_tag(
-    tag: &str, content: &str, attribs: HashMap<String, String>, root: &Value, conn: &Arc<Mutex<Connection>>, plugin_manager: &mut PluginManager
+    tag: &str, content: &str, attribs: HashMap<String, String>, root: &Value, conn: &Connection, plugin_manager: &mut PluginManager
     ) -> Option<String> {
   if tag == "custom-html" {
     return Some(content.to_string())
@@ -345,7 +347,6 @@ fn handle_custom_tag(
       let mut recent_posts = String::new();
       recent_posts.push_str("<h1>Recent Posts</h1>");
       recent_posts.push_str("<ul>");
-      let conn = conn.lock().unwrap();
       match db::get_all_post(&conn) {
         Ok(posts) => {
             for post in posts {
@@ -381,18 +382,8 @@ fn handle_custom_tag(
   if plugin_manager.has_plugin_handler(tag) {
     match plugin_manager.get_plugin_by_tag(tag) {
       Ok(func) => {
-          /*
-        match func.borrow_mut().call_in_new_context(&plugin_input.to_string()) {
-          Ok(v) => {
-            return Some(v)
-          },
-          Err(e) => {
-            println!("plugin call error: {}", e.to_string());
-            return Some("Plugin error".to_string())
-          },
-        }
-          */
-        match func.borrow_mut().call(&plugin_input.to_string()) {
+        let mut func = func.lock().unwrap();
+        match func.call(&plugin_input.to_string()) {
           Ok(v) => {
             return Some(v)
           },
