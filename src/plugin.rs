@@ -1,5 +1,5 @@
 use std::error::Error;
-use wasmi::{Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc};
+use wasmi::{Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc, CompilationMode};
 
 pub fn call_wasm(
     wasm_file_path: &str,
@@ -7,8 +7,15 @@ pub fn call_wasm(
     plugin_func: &str,
 ) -> Result<String, Box<dyn Error>> {
     let wasm = std::fs::read(wasm_file_path)?;
+
+    // Lazy + unchecked has significant perf benefits over Eager+checked.
+    // https://wasmi-labs.github.io/blog/posts/wasmi-v0.32/
+
+    let mut config = Config::default();
+    config.compilation_mode(CompilationMode::Lazy);
+
     let engine = Engine::new(&Config::default());
-    let module = Module::new(&engine, &wasm)?;
+    let module = unsafe { Module::new_unchecked(&engine, &wasm) }?;
 
     let mut store = Store::new(&engine, ());
     let mut linker = Linker::new(&engine);
