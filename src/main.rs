@@ -9,7 +9,8 @@ mod plugin_manager;
 mod render;
 mod routes;
 
-use std::env;
+use std::{env, fs};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use actix_web::{App, HttpServer, web::Data};
@@ -87,6 +88,13 @@ async fn main() -> std::io::Result<()> {
         let blog_posts: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).unwrap();
         for blog_post in blog_posts {
             db::create_post(&conn, blog_post).unwrap();
+        }
+    }
+
+    {
+        let blogs_dir = Path::new("posts");
+        if !blogs_dir.exists() {
+            fs::create_dir(blogs_dir)?;
         }
     }
 
