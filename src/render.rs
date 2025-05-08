@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex, MutexGuard}};
-
+use std::{collections::HashMap, fs, path::Path, sync::MutexGuard};
+use actix_web::Result;
 use rusqlite::Connection;
-use serde::{ser, Deserialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{db, plugin_manager::PluginManager, post::BlogPost};
@@ -103,7 +103,7 @@ pub struct TableRow {
   cells: Vec<TableCell>,
 }
 
-pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
+pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String> {
   let root: Value = serde_json::from_str(json_input).unwrap();
   let blocks: Vec<Block> = serde_json::from_str(json_input)?;
   let mut html = String::new();
@@ -336,6 +336,27 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
   (tag_name, attributes)
 }
 
+pub fn get_all_blog_posts() -> Result<Vec<Value>> {
+    let blogs_dir = Path::new("posts");
+    let mut posts: Vec<Value> = Vec::new();
+    if let Ok(entries) = fs::read_dir(blogs_dir) {
+        for entry in entries.filter_map(Result::ok)
+            .map(|a| a.path()).filter(|a| a.is_dir()) {
+            let slug = entry.file_name().unwrap();
+            let metadata_file = entry.join("metadata.json");
+            let content_file = entry.join("content.json");
+            if !metadata_file.exists() || !content_file.exists() { continue; }
+            let metadata = fs::read_to_string(metadata_file)?;
+            let mut metadata: Value = serde_json::from_str(&metadata)?;
+            metadata["slug"] = Value::from(slug.to_str());
+            metadata["id"] = Value::from(slug.to_str());
+            posts.push(metadata);
+        }
+    }
+
+    Ok(posts)
+}
+
 fn handle_custom_tag(
     tag: &str, content: &str, attribs: HashMap<String, String>, root: &Value, conn: &Connection, plugin_manager: &mut PluginManager
     ) -> Option<String> {
@@ -347,7 +368,7 @@ fn handle_custom_tag(
       let mut recent_posts = String::new();
       recent_posts.push_str("<h1>Recent Posts</h1>");
       recent_posts.push_str("<ul>");
-      match db::get_all_post(&conn) {
+      match get_all_blog_posts() {
         Ok(posts) => {
             for post in posts {
                 let slug = post.get("slug").and_then(|s| s.as_str()).unwrap();
