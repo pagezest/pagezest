@@ -2,7 +2,8 @@ use actix_web::{error::{ErrorBadRequest, ErrorInternalServerError, ErrorNotFound
 use rusqlite::Connection;
 use rust_embed::Embed;
 use serde_json::{ Value, json };
-use std::sync::{ Arc, Mutex } ;
+use std::{fs, path::Path, sync::{ Arc, Mutex }} ;
+use chrono::Utc;
 
 use crate::{db, memory::get_process_memory, plugin_manager::PluginManager, post::BlogPost, render::json_to_html, AppState};
 
@@ -11,12 +12,11 @@ use crate::{db, memory::get_process_memory, plugin_manager::PluginManager, post:
 struct Asset;
 
 pub async fn update_blog_post(
-  app_state: Data<AppState>,
+  _app_state: Data<AppState>,
   id: web::Path<String>,
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
   let req_json = req_json.into_inner();
-  let conn = app_state.conn.lock().unwrap();
   let id = id.into_inner();
 
   let slug = req_json
@@ -35,17 +35,22 @@ pub async fn update_blog_post(
     .ok_or_else(|| ErrorInternalServerError(""))?;
 
 
-  let blog_post: BlogPost = BlogPost::new(slug, title, content);
-  // Check if a blog with the given ID exists.
-  if db::get_post(&conn, &id, false)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))
-      ?.is_some() {
-        db::update_post(&conn, blog_post, &id, false)
-          .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-        return Ok(HttpResponse::Ok().json(
-            json!({"msg" : "Updated your Blog Successfully", "success" : true})
-        ));
+  let blog_dir = Path::new("posts").join(slug);
+  if !blog_dir.exists() {
+      return Err(ErrorNotFound("Post not found"));
   }
+
+  let metadata_file = blog_dir.join("metadata.json");
+  let content_file = blog_dir.join("content.json");
+  let metadata = json!({
+      "slug": slug,
+      "title": title,
+      "created_at": Utc::now().to_string(),
+      "updated_at": Utc::now().to_string(),
+  });
+  fs::write(metadata_file, metadata.to_string())?;
+  fs::write(content_file, content.to_string())?;
+
   Ok(HttpResponse::Ok().json(
       json!({"msg": format!("No blog found with id - {}", id), "success" : false})
   ))
@@ -56,34 +61,52 @@ pub async fn find_blog_by_id(
   app_state: Data<AppState>,
   path: web::Path<String>
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let id = path.into_inner();
-  let post = db::get_post(&conn, &id, false)
-    .or_else(|_| Err(ErrorNotFound("post not found")))?;
-    let post: Value = json!({"data": post});
-    Ok(HttpResponse::Ok().json(post))
+  let blog_dir = Path::new("posts").join(id);
+  let metadata_file = blog_dir.join("metadata.json");
+  let content_file = blog_dir.join("content.json");
+  if !metadata_file.exists() || !content_file.exists() {
+      return Err(ErrorNotFound("Post not found"));
+  }
+
+  let metadata = std::fs::read_to_string(metadata_file)?;
+  let mut post: Value = serde_json::from_str(&metadata)?;
+
+  let content = std::fs::read_to_string(content_file)?;
+  let content: Value = serde_json::from_str(&content)?;
+  post["content"] = content;
+
+  let post: Value = json!({"data": post});
+  Ok(HttpResponse::Ok().json(post))
 }
 
 pub async fn get_all_blog_posts(
-  app_state: Data<AppState>,
+  _app_state: Data<AppState>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+    let blogs_dir = Path::new("posts");
+    let mut posts: Vec<Value> = Vec::new();
+    if let Ok(entries) = fs::read_dir(blogs_dir) {
+        for entry in entries.filter_map(Result::ok).map(|a| a.path()).filter(|a| a.is_dir()) {
+            let slug = entry.file_name().unwrap();
+            let metadata_file = entry.join("metadata.json");
+            let content_file = entry.join("content.json");
+            if !metadata_file.exists() || !content_file.exists() { continue; }
+            let metadata = fs::read_to_string(metadata_file)?;
+            let mut metadata: Value = serde_json::from_str(&metadata)?;
+            metadata["slug"] = Value::from(slug.to_str());
+            metadata["id"] = Value::from(slug.to_str());
+            posts.push(metadata);
+        }
+    }
 
-  let posts = db::get_all_post(&conn)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    Ok(HttpResponse::Ok().json(json!({"data" : posts, "success": true})))
+    Ok(HttpResponse::Ok().json(json!({"data": posts})))
 }
 
 pub async fn create_new_blog_post(
-  app_state: Data<AppState>,
+  _app_state: Data<AppState>,
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
   let req_json = req_json.into_inner();
-  println!("post: {:?}", req_json);
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let slug = req_json.get("slug")
     .and_then(|v| v.as_str())
     .ok_or_else(|| ErrorInternalServerError(""))?;
@@ -93,20 +116,26 @@ pub async fn create_new_blog_post(
     .ok_or_else(|| ErrorInternalServerError(""))?;
   let content = req_json
     .get("content")
-    .cloned()
     .ok_or_else(|| ErrorInternalServerError(""))?;
 
-  let blog_post: BlogPost = BlogPost::new(slug, title, content);
 
-  // Check if Blog with given slug already exists or not.
-  let post = db::get_post(&conn, &blog_post.slug, true)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-  if post.is_some() {
-    return Err(ErrorBadRequest("slug already exists"));
+  let blog_dir = Path::new("posts").join(slug);
+  if blog_dir.exists() {
+      return Err(ErrorBadRequest("slug already exists"));
   }
+  fs::create_dir(&blog_dir)?;
 
-  db::create_post(&conn, blog_post)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+  let metadata_file = blog_dir.join("metadata.json");
+  let content_file = blog_dir.join("content.json");
+  let metadata = json!({
+      "slug": slug,
+      "title": title,
+      "created_at": Utc::now().to_string(),
+      "updated_at": Utc::now().to_string(),
+  });
+  fs::write(metadata_file, metadata.to_string())?;
+  fs::write(content_file, content.to_string())?;
+
   Ok(HttpResponse::Ok().json(json!({"msg" : "New Blog Created Successfully", "success": true})))
 }
 
@@ -144,26 +173,36 @@ pub async fn get_post_by_slug(
   path: Option<web::Path<String>>
 ) -> Result<impl Responder> {
   let slug = match path {
-    Some(path) => path.into_inner(),
-    None => "".to_string(),
+    Some(path) => &path.into_inner(),
+    None => "",
   };
   let conn = app_state.conn.lock()
     .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let plugin_manager = app_state.plugin_manager.clone();
-  let post = db::get_post(&conn, &slug, true)
-    .map_err(|_e| ErrorNotFound("post not found"))
-    .or_else(|_| Err(ErrorNotFound("post not found")))?;
 
-  if post.is_none() {
-    return Err(ErrorNotFound("Post not found"));
+
+
+  let blog_file = Path::new("posts").join(slug);
+  let metadata_file = blog_file.join("metadata.json");
+  let content_file = blog_file.join("content.json");
+  if !metadata_file.exists() || !blog_file.exists() || !content_file.exists() {
+      return Err(ErrorNotFound("Post not found"));
   }
-  let post = post.unwrap();
 
-  let md_json: Value = post.content.clone();
-  let md_content = md_json
-    .get("json").unwrap();
-  let md_content_str = md_content.to_string();
-  match render_page(&plugin_manager, &post, &md_content_str, &conn) {
+  let metadata = std::fs::read_to_string(metadata_file)?;
+  let metadata: Value = serde_json::from_str(&metadata)?;
+
+  let content = std::fs::read_to_string(content_file)?;
+  let content: Value = serde_json::from_str(&content)?;
+  let content = content.get("json").unwrap();
+
+  let post = BlogPost::new(slug,
+      metadata.get("title").and_then(|s| s.as_str()).unwrap(),
+      content.clone(),
+  );
+
+
+  match render_page(&plugin_manager, &post, &content, &conn) {
     Ok(resp) => {
       Ok(HttpResponse::Ok().body(resp))
     },
@@ -174,12 +213,12 @@ pub async fn get_post_by_slug(
   }
 }
 
-fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &str, conn: &Connection) -> Result<String, std::io::Error> {
-  let content_json: Value = serde_json::from_str(content)?;
+fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content_json: &Value, conn: &Connection) -> Result<String, std::io::Error> {
 
   let mut page_contents = String::new();
   let plugin_manager = plugin_manager.lock().unwrap();
-  match json_to_html(post, content, conn, plugin_manager) {
+  let content = content_json.to_string();
+  match json_to_html(post, &content, conn, plugin_manager) {
     Ok(s) => {
       page_contents.push_str(&s);
       return Ok(page_contents);
