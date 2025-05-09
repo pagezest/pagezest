@@ -2,7 +2,6 @@ mod api;
 mod db;
 mod errors;
 mod memory;
-mod mime;
 mod plugin;
 mod post;
 mod plugin_manager;

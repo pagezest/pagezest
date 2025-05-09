@@ -1,7 +1,5 @@
 use actix_files::Files;
 use actix_web::web;
-use actix_web::dev::{fn_service, ServiceRequest, ServiceResponse};
-use actix_files::NamedFile;
 
 use crate::api;
 
@@ -21,6 +19,8 @@ pub fn config(cfg: &mut web::ServiceConfig) {
 
 #[cfg(not(feature = "embed_admin_ui"))]
 pub fn serve_static_cfg(cfg: &mut web::ServiceConfig) {
+use actix_web::dev::{fn_service, ServiceRequest, ServiceResponse};
+use actix_files::NamedFile;
   cfg
     .service(
         Files::new("/pz-admin", "./pz-admin").show_files_listing().redirect_to_slash_directory().index_file("index.html")

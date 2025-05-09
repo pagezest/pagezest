@@ -5,6 +5,7 @@ use wasmi::{AsContextMut, Caller, Config, Engine, Func, Instance, Linker, Memory
 
 use crate::{errors::AppError, plugin::call_wasm};
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub struct Plugin {
     name: String,
@@ -66,7 +67,6 @@ impl PluginManager {
                         let name = json.get("name").and_then(|s| s.as_str()).expect("Manifest: name not found").to_string();
                         let tag = json.get("tag").and_then(|s| s.as_str()).expect("Manifest: tag not found {}").to_string();
                         let wasm_path = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
-                        let wasm_path_org = json.get("wasm_path").and_then(|s| s.as_str()).expect("Manifest: wasm_path not found").to_string();
                         let plugin_func_name = json.get("func_name").and_then(|s| s.as_str()).expect("Manifest: func_name not found").to_string();
                         let wasm_path = path.join(wasm_path);
                         let wasm_path_str = wasm_path.to_str().unwrap();
@@ -201,14 +201,4 @@ fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32
 
 fn console_log_stub(_caller: Caller<'_, ()>, _msg_ptr: i32) {
     println!("console.log called");
-}
-
-
-#[cfg(test)]
-
-#[test]
-fn test_plugin_manager() {
-    let mut m = PluginManager::new();
-    //m.load_plugin("a", "a");
-    m.unload_plugin("a");
 }
