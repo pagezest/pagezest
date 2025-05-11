@@ -260,10 +260,12 @@ function buildImage(builder: flatbuffers.Builder, node: any): flatbuffers.Offset
   const hrefOffset = builder.createString(node.href || '');
   const titleOffset = builder.createString(node.title || '');
   const textOffset = builder.createString(node.text || '');
+  const tokensOffset = buildTokensVector(builder, node.tokens || []);
   Image.startImage(builder);
   Image.addHref(builder, hrefOffset);
   Image.addTitle(builder, titleOffset);
   Image.addText(builder, textOffset);
+  Image.addTokens(builder, tokensOffset);
   return Image.endImage(builder);
 }
 
