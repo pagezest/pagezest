@@ -8,6 +8,7 @@ enum TokenType: byte {
   LIST_ITEM,
   SPACE,
   HR,
+  BR,
   TABLE,
   TEXT,
   STRONG,
@@ -17,7 +18,8 @@ enum TokenType: byte {
   IMAGE,
   HTML,
   CODE,
-  CODESPAN
+  CODESPAN,
+  BLOCKQUOTE
 }
 
 enum Align: byte {
@@ -51,6 +53,11 @@ table Paragraph {
   tokens: [Token];
 }
 
+table BlockQuote {
+  text: string (required);
+  tokens: [Token] (required);
+}
+
 table List {
   items: [Token] (required);
   ordered: bool;
@@ -67,6 +74,7 @@ table ListItem {
 table Space {}
 
 table Hr {}
+table Br {}
 
 table Table {
   align: [Align] (required);
@@ -131,6 +139,7 @@ union TokenValue {
   ListItem,
   Space,
   Hr,
+  Br,
   Table,
   Text,
   Strong,
@@ -140,7 +149,8 @@ union TokenValue {
   Image,
   Html,
   Code,
-  Codespan
+  Codespan,
+  BlockQuote,
 }
 
 table Token {

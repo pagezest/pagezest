@@ -5,7 +5,9 @@ TOP=$(realpath $(dirname $0))
 
 cd "$TOP"
 
+rm -rf pagezest-markdown.ts pagezest-markdown
+rm -rf $TOP/../admin/src/buffers/pagezest-markdown*
 flatc --rust post.fbs
-cp post_generated.rs ../src/post_flatbuffers.rs
-rm -rf ../admin/src/buffers/pagezest-markdown*
-cp -r pagezest-markdown* ../admin/src/buffers/
+flatc --ts post.fbs
+cp post_generated.rs $TOP/../src/post_flatbuffers.rs
+cp -r pagezest-markdown* $TOP/../admin/src/buffers/
