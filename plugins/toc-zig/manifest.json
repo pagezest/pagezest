@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "name": "toc",
-  "tag": "toc",
+  "name": "toc_zig",
+  "tag": "toc_zig",
   "wasm_path": "toc.wasm",
   "func_name": "toc"
 }
