@@ -3,7 +3,7 @@ use wasmi::{Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc};
 
 pub fn call_wasm(
     wasm_file_path: &str,
-    input: &str,
+    input: &Vec<u8>,
     plugin_func: &str,
 ) -> Result<String, Box<dyn Error>> {
     let wasm = std::fs::read(wasm_file_path)?;
@@ -28,7 +28,7 @@ pub fn call_wasm(
     let plugin_func: TypedFunc<(u32, u32), u32> =
         instance.get_typed_func(&store, plugin_func)?;
 
-    let input_buffer = input.as_bytes();
+    let input_buffer = input;
     let offset = 40_000u32;
     memory
         .write(&mut store, offset as usize, input_buffer)
