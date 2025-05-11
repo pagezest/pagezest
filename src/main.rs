@@ -5,8 +5,11 @@ mod memory;
 mod plugin;
 mod post;
 mod plugin_manager;
-mod render;
+mod render_flatbuffers;
 mod routes;
+#[allow(dead_code, unused_imports)]
+#[path = "./post_flatbuffers.rs"]
+mod post_flatbuffers;
 
 use std::env;
 use std::sync::{Arc, Mutex};
@@ -85,7 +88,7 @@ async fn main() -> std::io::Result<()> {
     if db::get_all_post(&conn).unwrap().is_empty() {
         let blog_posts: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).unwrap();
         for blog_post in blog_posts {
-            db::create_post(&conn, blog_post).unwrap();
+            //db::create_post(&conn, blog_post).unwrap();
         }
     }
 
