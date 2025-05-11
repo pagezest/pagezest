@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Post } from '../types';
 import { lexer, TokensList } from 'marked';
 import { getPost } from '@/api/posts';
+import { buildFlatBufferFromJson } from '@/buffers/json-to-flatbuffers';
 
 window.lexer = lexer;
 export function PostForm() {
@@ -21,6 +22,7 @@ export function PostForm() {
       md: '',
       json: undefined,
     },
+    content_flatbuffer64: '',
     author: user?.name || '',
   });
 
@@ -68,12 +70,14 @@ export function PostForm() {
   function updateContent(e: ChangeEventHandler<HTMLTextAreaElement>) {
     const value = e.target.value as string;
     const json = lexer(value);
-    console.log(json);
+    const flatbuffer = buildFlatBufferFromJson(json);
+    const flatbuffer64 = btoa(String.fromCharCode(...flatbuffer));
     form.setValues({
       content: {
         md: value,
         json,
       },
+      content_flatbuffer64: flatbuffer64,
     });
   }
 

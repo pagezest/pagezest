@@ -9,6 +9,7 @@ export interface Post {
   id: string;
   title: string;
   content: PostContentType;
+  content_flatbuffer64?: string;
   author: string;
   slug: string;
   created_at: string;
