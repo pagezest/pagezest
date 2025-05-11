@@ -4,7 +4,7 @@ use rust_embed::Embed;
 use serde_json::{ Value, json };
 use std::sync::{ Arc, Mutex } ;
 
-use crate::{db, memory::get_process_memory, plugin_manager::PluginManager, post::BlogPost, render::json_to_html, AppState};
+use crate::{db, memory::get_process_memory, plugin_manager::PluginManager, post::BlogPost, render_flatbuffers::flatbuffers_to_html, AppState};
 
 #[derive(Embed)]
 #[folder = "admin/dist/"]
@@ -22,20 +22,27 @@ pub async fn update_blog_post(
   let slug = req_json
     .get("slug")
     .and_then(|v| v.as_str())
-    .ok_or_else(|| ErrorInternalServerError(""))?;
+    .ok_or_else(|| ErrorInternalServerError("slug is missing"))?;
 
   let title = req_json
     .get("title")
     .and_then(|v| v.as_str())
-    .ok_or_else(|| ErrorInternalServerError(""))?;
+    .ok_or_else(|| ErrorInternalServerError("title is missing"))?;
 
   let content = req_json
     .get("content")
     .cloned()
-    .ok_or_else(|| ErrorInternalServerError(""))?;
+    .ok_or_else(|| ErrorInternalServerError("content is missing"))?;
+
+    let content_flatbuffer = req_json
+        .get("content_flatbuffer64")
+    .and_then(|v| v.as_str())
+    .ok_or_else(|| ErrorInternalServerError("flatbuffer64 is missing"))?;
+
+    let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
 
 
-  let blog_post: BlogPost = BlogPost::new(slug, title, content);
+    let blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer);
   // Check if a blog with the given ID exists.
   if db::get_post(&conn, &id, false)
     .map_err(|e| ErrorInternalServerError(e.to_string()))
@@ -59,8 +66,9 @@ pub async fn find_blog_by_id(
   let conn = app_state.conn.lock()
     .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let id = path.into_inner();
+  println!("find_blog_by_id: {}", id);
   let post = db::get_post(&conn, &id, false)
-    .or_else(|_| Err(ErrorNotFound("post not found")))?;
+    .or_else(|e| Err(ErrorNotFound(e.to_string())))?;
     let post: Value = json!({"data": post});
     Ok(HttpResponse::Ok().json(post))
 }
@@ -96,7 +104,14 @@ pub async fn create_new_blog_post(
     .cloned()
     .ok_or_else(|| ErrorInternalServerError(""))?;
 
-  let blog_post: BlogPost = BlogPost::new(slug, title, content);
+    let content_flatbuffer = req_json
+      .get("content_flatbuffer64")
+      .and_then(|f| f.as_str())
+      .ok_or_else(|| ErrorInternalServerError(""))?;
+
+    let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
+
+  let blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer);
 
   // Check if Blog with given slug already exists or not.
   let post = db::get_post(&conn, &blog_post.slug, true)
@@ -159,11 +174,7 @@ pub async fn get_post_by_slug(
   }
   let post = post.unwrap();
 
-  let md_json: Value = post.content.clone();
-  let md_content = md_json
-    .get("json").unwrap();
-  let md_content_str = md_content.to_string();
-  match render_page(&plugin_manager, &post, &md_content_str, &conn) {
+  match render_page(&plugin_manager, &post, &post.content_flatbuffer, &conn) {
     Ok(resp) => {
       Ok(HttpResponse::Ok().body(resp))
     },
@@ -174,12 +185,11 @@ pub async fn get_post_by_slug(
   }
 }
 
-fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &str, conn: &Connection) -> Result<String, std::io::Error> {
-  let content_json: Value = serde_json::from_str(content)?;
+fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &Vec<u8>, conn: &Connection) -> Result<String, std::io::Error> {
 
   let mut page_contents = String::new();
   let plugin_manager = plugin_manager.lock().unwrap();
-  match json_to_html(post, content, conn, plugin_manager) {
+  match flatbuffers_to_html(post, content, conn, plugin_manager) {
     Ok(s) => {
       page_contents.push_str(&s);
       return Ok(page_contents);
@@ -189,9 +199,6 @@ fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, cont
     }
 
   }
-  page_contents.push_str("<pre>");
-  page_contents.push_str(&serde_json::to_string_pretty(&content_json)?);
-  page_contents.push_str("</pre>");
   Ok(page_contents)
 }
 
