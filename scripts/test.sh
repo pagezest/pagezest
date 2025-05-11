@@ -23,14 +23,14 @@ test_backend() {
 # NOTE: for now, this compiles ONLY the toc (table of contents) plugin
 test_plugins() {
   mkdir -p $TOP/build/plugins/toc-zig
-  mkdir -p $TOP/build/plugins/toc
+  mkdir -p $TOP/build/plugins/toc-rust
   mkdir -p $TOP/build/plugins/footer
 
-  cd $TOP/plugins/toc
+  cd $TOP/plugins/toc-zig
   zig build -p . --prefix-exe-dir .
   rm -rf $TOP/build/plugins/toc-zig/*
-  cp -r $TOP/plugins/toc/manifest.json $TOP/build/plugins/toc-zig/
-  cp -r $TOP/plugins/toc/toc.wasm $TOP/build/plugins/toc-zig/
+  cp -r $TOP/plugins/toc-zig/manifest.json $TOP/build/plugins/toc-zig/
+  cp -r $TOP/plugins/toc-zig/toc.wasm $TOP/build/plugins/toc-zig/
 
   cd $TOP/plugins/toc-rust
   cargo build --release --target wasm32-unknown-unknown
