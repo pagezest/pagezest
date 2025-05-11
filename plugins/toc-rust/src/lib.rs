@@ -13,7 +13,7 @@ pub extern "C" fn toc(input_ptr: *const c_char, length: usize) -> *const c_char 
         for node in tokens {
             if node.type_() == TokenType::HEADING {
                 let heading = node.value_as_heading().unwrap();
-                if heading.depth() != -1 {
+                if heading.depth() == 1 {
                     toc_items.push(format!("<li>{}</li>", heading.text()));
                 }
             }
