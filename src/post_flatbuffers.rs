@@ -21,10 +21,10 @@ pub mod pagezest_markdown {
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_TOKEN_TYPE: i8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_TOKEN_TYPE: i8 = 16;
+pub const ENUM_MAX_TOKEN_TYPE: i8 = 18;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_TOKEN_TYPE: [TokenType; 17] = [
+pub const ENUM_VALUES_TOKEN_TYPE: [TokenType; 19] = [
   TokenType::UNKNOWN,
   TokenType::HEADING,
   TokenType::PARAGRAPH,
@@ -32,6 +32,7 @@ pub const ENUM_VALUES_TOKEN_TYPE: [TokenType; 17] = [
   TokenType::LIST_ITEM,
   TokenType::SPACE,
   TokenType::HR,
+  TokenType::BR,
   TokenType::TABLE,
   TokenType::TEXT,
   TokenType::STRONG,
@@ -42,6 +43,7 @@ pub const ENUM_VALUES_TOKEN_TYPE: [TokenType; 17] = [
   TokenType::HTML,
   TokenType::CODE,
   TokenType::CODESPAN,
+  TokenType::BLOCKQUOTE,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -56,19 +58,21 @@ impl TokenType {
   pub const LIST_ITEM: Self = Self(4);
   pub const SPACE: Self = Self(5);
   pub const HR: Self = Self(6);
-  pub const TABLE: Self = Self(7);
-  pub const TEXT: Self = Self(8);
-  pub const STRONG: Self = Self(9);
-  pub const EM: Self = Self(10);
-  pub const DEL: Self = Self(11);
-  pub const LINK: Self = Self(12);
-  pub const IMAGE: Self = Self(13);
-  pub const HTML: Self = Self(14);
-  pub const CODE: Self = Self(15);
-  pub const CODESPAN: Self = Self(16);
+  pub const BR: Self = Self(7);
+  pub const TABLE: Self = Self(8);
+  pub const TEXT: Self = Self(9);
+  pub const STRONG: Self = Self(10);
+  pub const EM: Self = Self(11);
+  pub const DEL: Self = Self(12);
+  pub const LINK: Self = Self(13);
+  pub const IMAGE: Self = Self(14);
+  pub const HTML: Self = Self(15);
+  pub const CODE: Self = Self(16);
+  pub const CODESPAN: Self = Self(17);
+  pub const BLOCKQUOTE: Self = Self(18);
 
   pub const ENUM_MIN: i8 = 0;
-  pub const ENUM_MAX: i8 = 16;
+  pub const ENUM_MAX: i8 = 18;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::UNKNOWN,
     Self::HEADING,
@@ -77,6 +81,7 @@ impl TokenType {
     Self::LIST_ITEM,
     Self::SPACE,
     Self::HR,
+    Self::BR,
     Self::TABLE,
     Self::TEXT,
     Self::STRONG,
@@ -87,6 +92,7 @@ impl TokenType {
     Self::HTML,
     Self::CODE,
     Self::CODESPAN,
+    Self::BLOCKQUOTE,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -98,6 +104,7 @@ impl TokenType {
       Self::LIST_ITEM => Some("LIST_ITEM"),
       Self::SPACE => Some("SPACE"),
       Self::HR => Some("HR"),
+      Self::BR => Some("BR"),
       Self::TABLE => Some("TABLE"),
       Self::TEXT => Some("TEXT"),
       Self::STRONG => Some("STRONG"),
@@ -108,6 +115,7 @@ impl TokenType {
       Self::HTML => Some("HTML"),
       Self::CODE => Some("CODE"),
       Self::CODESPAN => Some("CODESPAN"),
+      Self::BLOCKQUOTE => Some("BLOCKQUOTE"),
       _ => None,
     }
   }
@@ -259,10 +267,10 @@ impl flatbuffers::SimpleToVerifyInSlice for Align {}
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 pub const ENUM_MIN_TOKEN_VALUE: u8 = 0;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
-pub const ENUM_MAX_TOKEN_VALUE: u8 = 16;
+pub const ENUM_MAX_TOKEN_VALUE: u8 = 18;
 #[deprecated(since = "2.0.0", note = "Use associated constants instead. This will no longer be generated in 2021.")]
 #[allow(non_camel_case_types)]
-pub const ENUM_VALUES_TOKEN_VALUE: [TokenValue; 17] = [
+pub const ENUM_VALUES_TOKEN_VALUE: [TokenValue; 19] = [
   TokenValue::NONE,
   TokenValue::Heading,
   TokenValue::Paragraph,
@@ -270,6 +278,7 @@ pub const ENUM_VALUES_TOKEN_VALUE: [TokenValue; 17] = [
   TokenValue::ListItem,
   TokenValue::Space,
   TokenValue::Hr,
+  TokenValue::Br,
   TokenValue::Table,
   TokenValue::Text,
   TokenValue::Strong,
@@ -280,6 +289,7 @@ pub const ENUM_VALUES_TOKEN_VALUE: [TokenValue; 17] = [
   TokenValue::Html,
   TokenValue::Code,
   TokenValue::Codespan,
+  TokenValue::BlockQuote,
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -294,19 +304,21 @@ impl TokenValue {
   pub const ListItem: Self = Self(4);
   pub const Space: Self = Self(5);
   pub const Hr: Self = Self(6);
-  pub const Table: Self = Self(7);
-  pub const Text: Self = Self(8);
-  pub const Strong: Self = Self(9);
-  pub const Em: Self = Self(10);
-  pub const Del: Self = Self(11);
-  pub const Link: Self = Self(12);
-  pub const Image: Self = Self(13);
-  pub const Html: Self = Self(14);
-  pub const Code: Self = Self(15);
-  pub const Codespan: Self = Self(16);
+  pub const Br: Self = Self(7);
+  pub const Table: Self = Self(8);
+  pub const Text: Self = Self(9);
+  pub const Strong: Self = Self(10);
+  pub const Em: Self = Self(11);
+  pub const Del: Self = Self(12);
+  pub const Link: Self = Self(13);
+  pub const Image: Self = Self(14);
+  pub const Html: Self = Self(15);
+  pub const Code: Self = Self(16);
+  pub const Codespan: Self = Self(17);
+  pub const BlockQuote: Self = Self(18);
 
   pub const ENUM_MIN: u8 = 0;
-  pub const ENUM_MAX: u8 = 16;
+  pub const ENUM_MAX: u8 = 18;
   pub const ENUM_VALUES: &'static [Self] = &[
     Self::NONE,
     Self::Heading,
@@ -315,6 +327,7 @@ impl TokenValue {
     Self::ListItem,
     Self::Space,
     Self::Hr,
+    Self::Br,
     Self::Table,
     Self::Text,
     Self::Strong,
@@ -325,6 +338,7 @@ impl TokenValue {
     Self::Html,
     Self::Code,
     Self::Codespan,
+    Self::BlockQuote,
   ];
   /// Returns the variant's name or "" if unknown.
   pub fn variant_name(self) -> Option<&'static str> {
@@ -336,6 +350,7 @@ impl TokenValue {
       Self::ListItem => Some("ListItem"),
       Self::Space => Some("Space"),
       Self::Hr => Some("Hr"),
+      Self::Br => Some("Br"),
       Self::Table => Some("Table"),
       Self::Text => Some("Text"),
       Self::Strong => Some("Strong"),
@@ -346,6 +361,7 @@ impl TokenValue {
       Self::Html => Some("Html"),
       Self::Code => Some("Code"),
       Self::Codespan => Some("Codespan"),
+      Self::BlockQuote => Some("BlockQuote"),
       _ => None,
     }
   }
@@ -898,6 +914,122 @@ impl core::fmt::Debug for Paragraph<'_> {
       ds.finish()
   }
 }
+pub enum BlockQuoteOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct BlockQuote<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for BlockQuote<'a> {
+  type Inner = BlockQuote<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> BlockQuote<'a> {
+  pub const VT_TEXT: flatbuffers::VOffsetT = 4;
+  pub const VT_TOKENS: flatbuffers::VOffsetT = 6;
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    BlockQuote { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+    args: &'args BlockQuoteArgs<'args>
+  ) -> flatbuffers::WIPOffset<BlockQuote<'bldr>> {
+    let mut builder = BlockQuoteBuilder::new(_fbb);
+    if let Some(x) = args.tokens { builder.add_tokens(x); }
+    if let Some(x) = args.text { builder.add_text(x); }
+    builder.finish()
+  }
+
+
+  #[inline]
+  pub fn text(&self) -> &'a str {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<&str>>(BlockQuote::VT_TEXT, None).unwrap()}
+  }
+  #[inline]
+  pub fn tokens(&self) -> flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Token<'a>>> {
+    // Safety:
+    // Created from valid Table for this object
+    // which contains a valid value in this slot
+    unsafe { self._tab.get::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Token>>>>(BlockQuote::VT_TOKENS, None).unwrap()}
+  }
+}
+
+impl flatbuffers::Verifiable for BlockQuote<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .visit_field::<flatbuffers::ForwardsUOffset<&str>>("text", Self::VT_TEXT, true)?
+     .visit_field::<flatbuffers::ForwardsUOffset<flatbuffers::Vector<'_, flatbuffers::ForwardsUOffset<Token>>>>("tokens", Self::VT_TOKENS, true)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct BlockQuoteArgs<'a> {
+    pub text: Option<flatbuffers::WIPOffset<&'a str>>,
+    pub tokens: Option<flatbuffers::WIPOffset<flatbuffers::Vector<'a, flatbuffers::ForwardsUOffset<Token<'a>>>>>,
+}
+impl<'a> Default for BlockQuoteArgs<'a> {
+  #[inline]
+  fn default() -> Self {
+    BlockQuoteArgs {
+      text: None, // required field
+      tokens: None, // required field
+    }
+  }
+}
+
+pub struct BlockQuoteBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> BlockQuoteBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn add_text(&mut self, text: flatbuffers::WIPOffset<&'b  str>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(BlockQuote::VT_TEXT, text);
+  }
+  #[inline]
+  pub fn add_tokens(&mut self, tokens: flatbuffers::WIPOffset<flatbuffers::Vector<'b , flatbuffers::ForwardsUOffset<Token<'b >>>>) {
+    self.fbb_.push_slot_always::<flatbuffers::WIPOffset<_>>(BlockQuote::VT_TOKENS, tokens);
+  }
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> BlockQuoteBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    BlockQuoteBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<BlockQuote<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    self.fbb_.required(o, BlockQuote::VT_TEXT,"text");
+    self.fbb_.required(o, BlockQuote::VT_TOKENS,"tokens");
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for BlockQuote<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("BlockQuote");
+      ds.field("text", &self.text());
+      ds.field("tokens", &self.tokens());
+      ds.finish()
+  }
+}
 pub enum ListOffset {}
 #[derive(Copy, Clone, PartialEq)]
 
@@ -1333,6 +1465,85 @@ impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> HrBuilder<'a, 'b, A> {
 impl core::fmt::Debug for Hr<'_> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     let mut ds = f.debug_struct("Hr");
+      ds.finish()
+  }
+}
+pub enum BrOffset {}
+#[derive(Copy, Clone, PartialEq)]
+
+pub struct Br<'a> {
+  pub _tab: flatbuffers::Table<'a>,
+}
+
+impl<'a> flatbuffers::Follow<'a> for Br<'a> {
+  type Inner = Br<'a>;
+  #[inline]
+  unsafe fn follow(buf: &'a [u8], loc: usize) -> Self::Inner {
+    Self { _tab: flatbuffers::Table::new(buf, loc) }
+  }
+}
+
+impl<'a> Br<'a> {
+
+  #[inline]
+  pub unsafe fn init_from_table(table: flatbuffers::Table<'a>) -> Self {
+    Br { _tab: table }
+  }
+  #[allow(unused_mut)]
+  pub fn create<'bldr: 'args, 'args: 'mut_bldr, 'mut_bldr, A: flatbuffers::Allocator + 'bldr>(
+    _fbb: &'mut_bldr mut flatbuffers::FlatBufferBuilder<'bldr, A>,
+    _args: &'args BrArgs
+  ) -> flatbuffers::WIPOffset<Br<'bldr>> {
+    let mut builder = BrBuilder::new(_fbb);
+    builder.finish()
+  }
+
+}
+
+impl flatbuffers::Verifiable for Br<'_> {
+  #[inline]
+  fn run_verifier(
+    v: &mut flatbuffers::Verifier, pos: usize
+  ) -> Result<(), flatbuffers::InvalidFlatbuffer> {
+    use self::flatbuffers::Verifiable;
+    v.visit_table(pos)?
+     .finish();
+    Ok(())
+  }
+}
+pub struct BrArgs {
+}
+impl<'a> Default for BrArgs {
+  #[inline]
+  fn default() -> Self {
+    BrArgs {
+    }
+  }
+}
+
+pub struct BrBuilder<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> {
+  fbb_: &'b mut flatbuffers::FlatBufferBuilder<'a, A>,
+  start_: flatbuffers::WIPOffset<flatbuffers::TableUnfinishedWIPOffset>,
+}
+impl<'a: 'b, 'b, A: flatbuffers::Allocator + 'a> BrBuilder<'a, 'b, A> {
+  #[inline]
+  pub fn new(_fbb: &'b mut flatbuffers::FlatBufferBuilder<'a, A>) -> BrBuilder<'a, 'b, A> {
+    let start = _fbb.start_table();
+    BrBuilder {
+      fbb_: _fbb,
+      start_: start,
+    }
+  }
+  #[inline]
+  pub fn finish(self) -> flatbuffers::WIPOffset<Br<'a>> {
+    let o = self.fbb_.end_table(self.start_);
+    flatbuffers::WIPOffset::new(o.value())
+  }
+}
+
+impl core::fmt::Debug for Br<'_> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    let mut ds = f.debug_struct("Br");
       ds.finish()
   }
 }
@@ -2709,6 +2920,21 @@ impl<'a> Token<'a> {
 
   #[inline]
   #[allow(non_snake_case)]
+  pub fn value_as_br(&self) -> Option<Br<'a>> {
+    if self.value_type() == TokenValue::Br {
+      self.value().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { Br::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
+  #[inline]
+  #[allow(non_snake_case)]
   pub fn value_as_table(&self) -> Option<Table<'a>> {
     if self.value_type() == TokenValue::Table {
       self.value().map(|t| {
@@ -2857,6 +3083,21 @@ impl<'a> Token<'a> {
     }
   }
 
+  #[inline]
+  #[allow(non_snake_case)]
+  pub fn value_as_block_quote(&self) -> Option<BlockQuote<'a>> {
+    if self.value_type() == TokenValue::BlockQuote {
+      self.value().map(|t| {
+       // Safety:
+       // Created from a valid Table for this object
+       // Which contains a valid union in this slot
+       unsafe { BlockQuote::init_from_table(t) }
+     })
+    } else {
+      None
+    }
+  }
+
 }
 
 impl flatbuffers::Verifiable for Token<'_> {
@@ -2875,6 +3116,7 @@ impl flatbuffers::Verifiable for Token<'_> {
           TokenValue::ListItem => v.verify_union_variant::<flatbuffers::ForwardsUOffset<ListItem>>("TokenValue::ListItem", pos),
           TokenValue::Space => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Space>>("TokenValue::Space", pos),
           TokenValue::Hr => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Hr>>("TokenValue::Hr", pos),
+          TokenValue::Br => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Br>>("TokenValue::Br", pos),
           TokenValue::Table => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Table>>("TokenValue::Table", pos),
           TokenValue::Text => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Text>>("TokenValue::Text", pos),
           TokenValue::Strong => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Strong>>("TokenValue::Strong", pos),
@@ -2885,6 +3127,7 @@ impl flatbuffers::Verifiable for Token<'_> {
           TokenValue::Html => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Html>>("TokenValue::Html", pos),
           TokenValue::Code => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Code>>("TokenValue::Code", pos),
           TokenValue::Codespan => v.verify_union_variant::<flatbuffers::ForwardsUOffset<Codespan>>("TokenValue::Codespan", pos),
+          TokenValue::BlockQuote => v.verify_union_variant::<flatbuffers::ForwardsUOffset<BlockQuote>>("TokenValue::BlockQuote", pos),
           _ => Ok(()),
         }
      })?
@@ -2988,6 +3231,13 @@ impl core::fmt::Debug for Token<'_> {
             ds.field("value", &"InvalidFlatbuffer: Union discriminant does not match value.")
           }
         },
+        TokenValue::Br => {
+          if let Some(x) = self.value_as_br() {
+            ds.field("value", &x)
+          } else {
+            ds.field("value", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
         TokenValue::Table => {
           if let Some(x) = self.value_as_table() {
             ds.field("value", &x)
@@ -3053,6 +3303,13 @@ impl core::fmt::Debug for Token<'_> {
         },
         TokenValue::Codespan => {
           if let Some(x) = self.value_as_codespan() {
+            ds.field("value", &x)
+          } else {
+            ds.field("value", &"InvalidFlatbuffer: Union discriminant does not match value.")
+          }
+        },
+        TokenValue::BlockQuote => {
+          if let Some(x) = self.value_as_block_quote() {
             ds.field("value", &x)
           } else {
             ds.field("value", &"InvalidFlatbuffer: Union discriminant does not match value.")

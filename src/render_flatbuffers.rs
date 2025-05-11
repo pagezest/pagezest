@@ -53,6 +53,10 @@ fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Conn
                 return format!("<p>{}</p>\n", render_inlines(paragraph.tokens().unwrap()))
             }
         },
+        TokenType::BLOCKQUOTE => {
+            let blockquote = token.value_as_block_quote().unwrap();
+            return format!("<blockquote>{}</blockquote>\n", render_inlines(blockquote.tokens()))
+        },
         TokenType::HEADING => {
             let heading = token.value_as_heading().unwrap();
             if let Some(custom) = try_handle_custom_tag(heading.text(), root, post, conn, plugin_manager) {
@@ -103,6 +107,7 @@ fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Conn
             format!("<table><thead><tr>{}</tr></thead><tbody>{}</tbody></table>\n", header_html, rows_html)
         },
         TokenType::HR => "<hr/>".to_string(),
+        TokenType::BR => "<br/>".to_string(),
         _ => format!("<pre>TODO N/A****: {:?}</pre>", token.type_())
 
     }
@@ -332,6 +337,14 @@ fn render_inlines(tokens: Vector<'_, ForwardsUOffset<Token<'_>>>) -> String {
         },
         TokenType::HR => "<hr/>".to_string(),
         TokenType::LIST_ITEM => "<h1>LIST ITEM</h1>".to_string(),
+        TokenType::PARAGRAPH => {
+            let paragraph = token.value_as_paragraph().unwrap();
+            return format!("<p>{}</p>\n", render_inlines(paragraph.tokens().unwrap()))
+        },
+        TokenType::BLOCKQUOTE => {
+            let blockquote = token.value_as_block_quote().unwrap();
+            return format!("<blockquote>{}</blockquote>\n", render_inlines(blockquote.tokens()))
+        },
         _ => format!("TODO: {:?}", token.type_()),
 
     }
