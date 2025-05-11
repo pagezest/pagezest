@@ -1,0 +1,8 @@
+{
+  "version": "1.0",
+  "name": "toc",
+  "tag": "toc",
+  "wasm_path": "toc.wasm",
+  "func_name": "toc"
+}
+
