@@ -3,6 +3,8 @@
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
 export { Align } from './pagezest-markdown/align.js';
+export { BlockQuote } from './pagezest-markdown/block-quote.js';
+export { Br } from './pagezest-markdown/br.js';
 export { Code } from './pagezest-markdown/code.js';
 export { Codespan } from './pagezest-markdown/codespan.js';
 export { Del } from './pagezest-markdown/del.js';

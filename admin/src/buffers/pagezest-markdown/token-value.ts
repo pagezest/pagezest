@@ -2,6 +2,8 @@
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 
+import { BlockQuote } from '../pagezest-markdown/block-quote.js';
+import { Br } from '../pagezest-markdown/br.js';
 import { Code } from '../pagezest-markdown/code.js';
 import { Codespan } from '../pagezest-markdown/codespan.js';
 import { Del } from '../pagezest-markdown/del.js';
@@ -28,22 +30,24 @@ export enum TokenValue {
   ListItem = 4,
   Space = 5,
   Hr = 6,
-  Table = 7,
-  Text = 8,
-  Strong = 9,
-  Em = 10,
-  Del = 11,
-  Link = 12,
-  Image = 13,
-  Html = 14,
-  Code = 15,
-  Codespan = 16
+  Br = 7,
+  Table = 8,
+  Text = 9,
+  Strong = 10,
+  Em = 11,
+  Del = 12,
+  Link = 13,
+  Image = 14,
+  Html = 15,
+  Code = 16,
+  Codespan = 17,
+  BlockQuote = 18
 }
 
 export function unionToTokenValue(
   type: TokenValue,
-  accessor: (obj:Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text) => Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null
-): Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null {
+  accessor: (obj:BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text) => BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null
+): BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null {
   switch(TokenValue[type]) {
     case 'NONE': return null; 
     case 'Heading': return accessor(new Heading())! as Heading;
@@ -52,6 +56,7 @@ export function unionToTokenValue(
     case 'ListItem': return accessor(new ListItem())! as ListItem;
     case 'Space': return accessor(new Space())! as Space;
     case 'Hr': return accessor(new Hr())! as Hr;
+    case 'Br': return accessor(new Br())! as Br;
     case 'Table': return accessor(new Table())! as Table;
     case 'Text': return accessor(new Text())! as Text;
     case 'Strong': return accessor(new Strong())! as Strong;
@@ -62,15 +67,16 @@ export function unionToTokenValue(
     case 'Html': return accessor(new Html())! as Html;
     case 'Code': return accessor(new Code())! as Code;
     case 'Codespan': return accessor(new Codespan())! as Codespan;
+    case 'BlockQuote': return accessor(new BlockQuote())! as BlockQuote;
     default: return null;
   }
 }
 
 export function unionListToTokenValue(
   type: TokenValue, 
-  accessor: (index: number, obj:Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text) => Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null, 
+  accessor: (index: number, obj:BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text) => BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null, 
   index: number
-): Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null {
+): BlockQuote|Br|Code|Codespan|Del|Em|Heading|Hr|Html|Image|Link|List|ListItem|Paragraph|Space|Strong|Table|Text|null {
   switch(TokenValue[type]) {
     case 'NONE': return null; 
     case 'Heading': return accessor(index, new Heading())! as Heading;
@@ -79,6 +85,7 @@ export function unionListToTokenValue(
     case 'ListItem': return accessor(index, new ListItem())! as ListItem;
     case 'Space': return accessor(index, new Space())! as Space;
     case 'Hr': return accessor(index, new Hr())! as Hr;
+    case 'Br': return accessor(index, new Br())! as Br;
     case 'Table': return accessor(index, new Table())! as Table;
     case 'Text': return accessor(index, new Text())! as Text;
     case 'Strong': return accessor(index, new Strong())! as Strong;
@@ -89,6 +96,7 @@ export function unionListToTokenValue(
     case 'Html': return accessor(index, new Html())! as Html;
     case 'Code': return accessor(index, new Code())! as Code;
     case 'Codespan': return accessor(index, new Codespan())! as Codespan;
+    case 'BlockQuote': return accessor(index, new BlockQuote())! as BlockQuote;
     default: return null;
   }
 }

@@ -8,6 +8,7 @@ import {
   Em,
   Heading,
   Hr,
+  Br,
   Html,
   Image,
   Link,
@@ -42,7 +43,6 @@ function buildToken(builder: flatbuffers.Builder, node: any): flatbuffers.Offset
   let type: TokenType;
   let valueOffset: flatbuffers.Offset;
 
-
   switch (node.type) {
     case 'heading':
       type = TokenType.HEADING;
@@ -67,6 +67,10 @@ function buildToken(builder: flatbuffers.Builder, node: any): flatbuffers.Offset
     case 'hr':
       type = TokenType.HR;
       valueOffset = Hr.createHr(builder);
+      break;
+    case 'br':
+      type = TokenType.BR;
+      valueOffset = Br.createBr(builder);
       break;
     case 'table':
       type = TokenType.TABLE;
@@ -108,6 +112,10 @@ function buildToken(builder: flatbuffers.Builder, node: any): flatbuffers.Offset
       type = TokenType.CODESPAN;
       valueOffset = buildCodespan(builder, node);
       break;
+    case 'blockquote':
+        type = TokenType.BLOCKQUOTE;
+      valueOffset = buildParagraph(builder, node);
+      break;
     default:
       throw new Error(`Unsupported node type: ${node.type}`);
   }
@@ -137,12 +145,7 @@ function buildText(builder: flatbuffers.Builder, node: any): flatbuffers.Offset 
   Text.addText(builder, textOffset);
   if (tokensOffset) Text.addTokens(builder, tokensOffset);
   Text.addEscaped(builder, escaped);
-  try {
-    return Text.endText(builder);
-  } catch(e) {
-    console.log(node);
-    debugger;
-  }
+  return Text.endText(builder);
 }
 
 function buildTokensVector(builder: flatbuffers.Builder, nodes: any[]): flatbuffers.Offset {
@@ -190,7 +193,8 @@ function buildListItem(builder: flatbuffers.Builder, node: any): flatbuffers.Off
 }
 
 function buildTable(builder: flatbuffers.Builder, node: any): flatbuffers.Offset {
-  const alignments = (node.align || []).map((a: string) => Align[a.toUpperCase()] || Align.NONE);
+  console.log(node.align);
+  const alignments = (node.align || []).map((a: string) => Align[a?.toUpperCase()] || Align.NONE);
   const alignOffset = Table.createAlignVector(builder, alignments);
   const headerCells = (node.header || []).map((c: any) => buildTableCell(builder, c));
   const headerOffset = Table.createHeaderVector(builder, headerCells);
