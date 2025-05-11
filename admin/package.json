@@ -22,6 +22,7 @@
     "@tiptap/pm": "^2.11.7",
     "@tiptap/react": "^2.11.7",
     "@tiptap/starter-kit": "^2.11.7",
+    "flatbuffers": "^25.2.10",
     "lucide-react": "^0.344.0",
     "marked": "^15.0.8",
     "react": "^18.3.1",
