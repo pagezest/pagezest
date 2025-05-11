@@ -158,16 +158,14 @@ impl Plugin {
 
 
     pub fn call(
-        &mut self, input: &str
+        &mut self, input: &Vec<u8>
     ) -> Result<String, Box<dyn Error>> {
         let offset = 40_000u32;
         self.memory
-            .write(&mut self.store.as_context_mut(), offset as usize, input.as_bytes())
+            .write(&mut self.store.as_context_mut(), offset as usize, input)
             .unwrap();
-        //println!("write memory OK: {}", input.len());
         let res_ptr = (&mut self.plugin_func)
             .call(&mut self.store, (offset, input.len() as u32))?;
-        //println!("**********reading resp: {}", res_ptr);
         let mut output = Vec::new();
         let mut curr_ptr = res_ptr;
         loop {
@@ -188,7 +186,7 @@ impl Plugin {
     }
 
     pub fn call_in_new_context(
-        &mut self, input: &str
+        &mut self, input: &Vec<u8>
     ) -> Result<String, Box<dyn Error>> {
         println!("call_in_new_context: {}, {}, {}", self.wasm_file_path, "", self.plugin_func_name);
         call_wasm(&self.wasm_file_path, input, &self.plugin_func_name)
