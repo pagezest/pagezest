@@ -1,5 +1,5 @@
 use crate::post::BlogPost;
-use rusqlite::{Connection, Result};
+use rusqlite::{params, Connection, Result};
 use serde_json::{Value, json};
 
 pub fn init_db(conn: &Connection) -> Result<()> {
@@ -8,6 +8,7 @@ pub fn init_db(conn: &Connection) -> Result<()> {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
+        content_flatbuffer BLOB NOT NULL,
         slug TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -19,12 +20,12 @@ pub fn init_db(conn: &Connection) -> Result<()> {
 
 pub fn create_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
     let create_post_query = r#"
-        INSERT INTO posts(slug, title, content)
-        VALUES (?, ?, ?)
+        INSERT INTO posts(slug, title, content, content_flatbuffer)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(slug) DO NOTHING
     "#;
     let content_str = blog_post.content.to_string();
-    let params = [blog_post.slug, blog_post.title, content_str];
+    let params = params![blog_post.slug, blog_post.title, content_str, blog_post.content_flatbuffer];
     conn.execute(create_post_query, params)?;
     Ok(())
 }
@@ -62,12 +63,12 @@ pub fn get_all_post(conn: &Connection) -> Result<Vec<Value>> {
 pub fn get_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result<Option<BlogPost>> {
     let query = if by_slug {
         r#"
-        SELECT slug, title, content, created_at, updated_at
+        SELECT slug, title, content, content_flatbuffer, created_at, updated_at
         FROM posts WHERE slug = ?1
         "#
     } else {
         r#"
-        SELECT slug, title, content, created_at, updated_at
+        SELECT slug, title, content, content_flatbuffer, created_at, updated_at
         FROM posts WHERE id = ?1
         "#
     };
@@ -78,13 +79,15 @@ pub fn get_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result<Op
         let slug: String = row.get(0)?;
         let title: String = row.get(1)?;
         let content_str: String = row.get(2)?;
+        let content_flatbuffer: Vec<u8> = row.get(3)?;
         let content_json: Value = serde_json::from_str(&content_str).unwrap();
-        let created_at: String = row.get(3)?;
-        let updated_at: String = row.get(4)?;
+        let created_at: String = row.get(4)?;
+        let updated_at: String = row.get(5)?;
         Ok(BlogPost {
             slug,
             title,
             content: content_json,
+            content_flatbuffer,
             created_at,
             updated_at,
         })
@@ -106,27 +109,28 @@ pub fn update_post(
     let update_post_query = if by_slug {
         r#"
         UPDATE posts
-        SET title = ?, content = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
+        SET title = ?, content = ?, content_flatbuffer = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
         WHERE slug = ?
         "#
     } else {
         r#"
         UPDATE posts
-        SET title = ?, content = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
+        SET title = ?, content = ?, content_flatbuffer = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         "#
     };
 
     let content_str = blog_post.content.to_string();
-    let params: Vec<&dyn rusqlite::ToSql> = if by_slug {
-        vec![
-            &blog_post.title,
-            &content_str,
-            &blog_post.slug,
-            &blog_post.slug,
+    let params = if by_slug {
+        params![
+            blog_post.title,
+            content_str,
+            blog_post.content_flatbuffer,
+            blog_post.slug,
+            blog_post.slug,
         ]
     } else {
-        vec![&blog_post.title, &content_str, &blog_post.slug, &identifier]
+        params![blog_post.title, content_str, blog_post.content_flatbuffer, blog_post.slug, identifier]
     };
     conn.execute(update_post_query, &*params)?;
     Ok(())
