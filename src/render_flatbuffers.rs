@@ -35,7 +35,7 @@ pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, conn: &Connectio
     html.push_str("<body>");
     if let Some(tokens) = doc.tokens() {
         for node in tokens {
-            html.push_str(&render_token(&node, &doc, conn, &mut plugin_manager));
+            html.push_str(&render_token(&node, &doc, post, conn, &mut plugin_manager));
         }
     }
     html.push_str("</body>");
@@ -43,11 +43,11 @@ pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, conn: &Connectio
     Ok(html.to_string())
 }
 
-fn render_token(token: &Token, root: &Document<'_>, conn: &Connection, plugin_manager: &mut PluginManager) -> String {
+fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Connection, plugin_manager: &mut PluginManager) -> String {
     return match token.type_() {
         TokenType::PARAGRAPH => {
             let paragraph = token.value_as_paragraph().unwrap();
-            if let Some(custom) = try_handle_custom_tag(paragraph.text(), root, conn, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(paragraph.text(), root, post, conn, plugin_manager) {
                 return custom
             } else {
                 return format!("<p>{}</p>\n", render_inlines(paragraph.tokens().unwrap()))
@@ -55,7 +55,7 @@ fn render_token(token: &Token, root: &Document<'_>, conn: &Connection, plugin_ma
         },
         TokenType::HEADING => {
             let heading = token.value_as_heading().unwrap();
-            if let Some(custom) = try_handle_custom_tag(heading.text(), root, conn, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(heading.text(), root, post, conn, plugin_manager) {
                 custom
             } else {
                 format!("<h{d}>{}</h{d}>\n", render_inlines(heading.tokens()), d = heading.depth())
@@ -108,7 +108,7 @@ fn render_token(token: &Token, root: &Document<'_>, conn: &Connection, plugin_ma
     }
 }
 
-fn try_handle_custom_tag(text: &str, root: &Document<'_>, conn: &Connection, plugin_manager: &mut PluginManager) -> Option<String> {
+fn try_handle_custom_tag(text: &str, root: &Document<'_>, post: &BlogPost, conn: &Connection, plugin_manager: &mut PluginManager) -> Option<String> {
   let trimmed = text.trim();
   if let Some(start) = trimmed.find("[[") {
     if let Some(end) = trimmed.find("]]") {
@@ -117,7 +117,7 @@ fn try_handle_custom_tag(text: &str, root: &Document<'_>, conn: &Connection, plu
       let close_tag = format!("[[/{}]]", tag_name);
       if let Some(close_start) = trimmed.find(&close_tag) {
         let content = &trimmed[end + 2..close_start];
-        return Some(handle_custom_tag(&tag_name, content, attributes, root, conn, plugin_manager))?;
+        return Some(handle_custom_tag(&tag_name, content, attributes, root, post, conn, plugin_manager))?;
       }
     }
   }
@@ -191,7 +191,12 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
 }
 
 fn handle_custom_tag(
-    tag: &str, content: &str, attribs: HashMap<String, String>, root: &Document<'_>, conn: &Connection, plugin_manager: &mut PluginManager
+    tag: &str,
+    content: &str,
+    attribs: HashMap<String, String>,
+    root: &Document<'_>,
+    post: &BlogPost,
+    conn: &Connection, plugin_manager: &mut PluginManager
     ) -> Option<String> {
   if tag == "custom-html" {
     return Some(content.to_string())
@@ -226,18 +231,12 @@ fn handle_custom_tag(
       return Some(recent_posts.to_string());
   }
 
-  let plugin_input = json!({
-      "content": content,
-      "tag": tag,
-      //"root": root,
-      "attributes": attribs,
-  });
   
   if plugin_manager.has_plugin_handler(tag) {
     match plugin_manager.get_plugin_by_tag(tag) {
       Ok(func) => {
         let mut func = func.lock().unwrap();
-        match func.call(&plugin_input.to_string()) {
+        match func.call(&post.content_flatbuffer) {
           Ok(v) => {
             return Some(v)
           },
