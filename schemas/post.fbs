@@ -1,0 +1,155 @@
+namespace pagezest_markdown;
+
+enum TokenType: byte {
+  UNKNOWN = 0,
+  HEADING,
+  PARAGRAPH,
+  LIST,
+  LIST_ITEM,
+  SPACE,
+  HR,
+  TABLE,
+  TEXT,
+  STRONG,
+  EM,
+  DEL,
+  LINK,
+  IMAGE,
+  HTML,
+  CODE,
+  CODESPAN
+}
+
+enum Align: byte {
+  NONE = 0,
+  LEFT,
+  RIGHT,
+  CENTER
+}
+
+table TableCell {
+  text: string (required);
+  tokens: [Token] (required);
+  header: bool = false;
+  align: Align = NONE;
+}
+
+table TableRow {
+  cells: [TableCell];
+}
+
+// --- Token variants ---
+
+table Heading {
+  text: string (required);
+  depth: int;
+  tokens: [Token] (required);
+}
+
+table Paragraph {
+  text: string (required);
+  tokens: [Token];
+}
+
+table List {
+  items: [Token] (required);
+  ordered: bool;
+  start: int;
+  loose: bool;
+}
+
+table ListItem {
+  tokens: [Token];
+  task: bool;
+  checked: bool;
+}
+
+table Space {}
+
+table Hr {}
+
+table Table {
+  align: [Align] (required);
+  header: [TableCell] (required);
+  rows: [TableRow] (required);
+}
+
+table Text {
+  text: string (required);
+  tokens: [Token];
+  escaped: bool;
+}
+
+table Strong {
+  tokens: [Token] (required);
+}
+
+table Em {
+  tokens: [Token] (required);
+}
+
+table Del {
+  tokens: [Token] (required);
+}
+
+table Link {
+  tokens: [Token] (required);
+  href: string;
+  title: string;
+}
+
+table Image {
+  href: string;
+  title: string;
+  text: string;
+  tokens: [Token] (required);
+}
+
+table Html {
+  text: string (required);
+}
+
+table Code {
+  lang: string (required);
+  text: string (required);
+  block: bool;
+  pre: bool;
+  tokens: [Token] (required);
+}
+
+table Codespan {
+  text: string (required);
+  tokens: [Token] (required);
+}
+
+// --- Union & Wrapper ---
+
+union TokenValue {
+  Heading,
+  Paragraph,
+  List,
+  ListItem,
+  Space,
+  Hr,
+  Table,
+  Text,
+  Strong,
+  Em,
+  Del,
+  Link,
+  Image,
+  Html,
+  Code,
+  Codespan
+}
+
+table Token {
+  type: TokenType;
+  value: TokenValue;
+}
+
+table Document {
+  tokens: [Token];
+}
+
+root_type Document;
