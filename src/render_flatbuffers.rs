@@ -1,11 +1,9 @@
 use std::{collections::HashMap, sync::MutexGuard};
 
 use flatbuffers::{ForwardsUOffset, Vector};
-use rusqlite::Connection;
 use serde::de::Error;
-use serde_json::json;
 
-use crate::{db, plugin_manager::PluginManager, post::BlogPost, post_flatbuffers::pagezest_markdown::{root_as_document, Document, ListItem, Token, TokenType}};
+use crate::{plugin_manager::PluginManager, post::BlogPost, post_flatbuffers::pagezest_markdown::{root_as_document, Document, ListItem, Token, TokenType}, posts_filesystem::PostsFS};
 
 const STYLE: &str = if cfg!(feature = "embed_styles") {
     concat!("<style>", include_str!("../assets/milligram.min.css"), "</style>")
@@ -21,7 +19,7 @@ fn html_escape(input: &str) -> String {
     .replace('\'', "&#39;")
 }
 
-pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
+pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
     let doc = root_as_document(&fb_input)
         .map_err(|e| serde_json::Error::custom(e.to_string()))?;
     let mut html = String::new();
@@ -35,7 +33,7 @@ pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, conn: &Connectio
     html.push_str("<body>");
     if let Some(tokens) = doc.tokens() {
         for node in tokens {
-            html.push_str(&render_token(&node, &doc, post, conn, &mut plugin_manager));
+            html.push_str(&render_token(&node, &doc, post, &mut plugin_manager));
         }
     }
     html.push_str("</body>");
@@ -43,11 +41,11 @@ pub fn flatbuffers_to_html(post: &BlogPost, fb_input: &Vec<u8>, conn: &Connectio
     Ok(html.to_string())
 }
 
-fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Connection, plugin_manager: &mut PluginManager) -> String {
+fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, plugin_manager: &mut PluginManager) -> String {
     return match token.type_() {
         TokenType::PARAGRAPH => {
             let paragraph = token.value_as_paragraph().unwrap();
-            if let Some(custom) = try_handle_custom_tag(paragraph.text(), root, post, conn, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(paragraph.text(), root, post, plugin_manager) {
                 return custom
             } else {
                 return format!("<p>{}</p>\n", render_inlines(paragraph.tokens().unwrap()))
@@ -59,7 +57,7 @@ fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Conn
         },
         TokenType::HEADING => {
             let heading = token.value_as_heading().unwrap();
-            if let Some(custom) = try_handle_custom_tag(heading.text(), root, post, conn, plugin_manager) {
+            if let Some(custom) = try_handle_custom_tag(heading.text(), root, post, plugin_manager) {
                 custom
             } else {
                 format!("<h{d}>{}</h{d}>\n", render_inlines(heading.tokens()), d = heading.depth())
@@ -113,7 +111,7 @@ fn render_token(token: &Token, root: &Document<'_>, post: &BlogPost, conn: &Conn
     }
 }
 
-fn try_handle_custom_tag(text: &str, root: &Document<'_>, post: &BlogPost, conn: &Connection, plugin_manager: &mut PluginManager) -> Option<String> {
+fn try_handle_custom_tag(text: &str, root: &Document<'_>, post: &BlogPost, plugin_manager: &mut PluginManager) -> Option<String> {
   let trimmed = text.trim();
   if let Some(start) = trimmed.find("[[") {
     if let Some(end) = trimmed.find("]]") {
@@ -122,7 +120,7 @@ fn try_handle_custom_tag(text: &str, root: &Document<'_>, post: &BlogPost, conn:
       let close_tag = format!("[[/{}]]", tag_name);
       if let Some(close_start) = trimmed.find(&close_tag) {
         let content = &trimmed[end + 2..close_start];
-        return Some(handle_custom_tag(&tag_name, content, attributes, root, post, conn, plugin_manager))?;
+        return Some(handle_custom_tag(&tag_name, content, attributes, root, post, plugin_manager))?;
       }
     }
   }
@@ -201,35 +199,34 @@ fn handle_custom_tag(
     attribs: HashMap<String, String>,
     root: &Document<'_>,
     post: &BlogPost,
-    conn: &Connection, plugin_manager: &mut PluginManager
+    plugin_manager: &mut PluginManager,
     ) -> Option<String> {
   if tag == "custom-html" {
     return Some(content.to_string())
   }
 
+
   if tag == "posts" {
+      let posts_fs = PostsFS::default().unwrap();
       let mut recent_posts = String::new();
       recent_posts.push_str("<h1>Recent Posts</h1>");
       recent_posts.push_str("<ul>");
-      match db::get_all_post(&conn) {
+      match posts_fs.list() {
         Ok(posts) => {
             for post in posts {
-                let slug = post.get("slug").and_then(|s| s.as_str()).unwrap();
-                let title = post.get("title").and_then(|s| s.as_str()).unwrap();
-                let created_at = post.get("created_at").and_then(|s| s.as_str()).unwrap();
-                if slug == "" {
+                if post.slug == "" || post.slug == "index" {
                     continue;
                 }
                 recent_posts.push_str(&format!(
                         "<li><a href='/{}'> {} | {} </a></li>",
-                        html_escape(&slug),
-                        html_escape(&title),
-                        html_escape(&created_at),
+                        html_escape(&post.slug),
+                        html_escape(&post.title),
+                        html_escape(&post.created_at),
                         ));
             }
         },
         Err(e) => {
-            recent_posts.push_str(&format!("Error getting posts: {}", e.to_string()));
+            recent_posts.push_str(&format!("Error getting posts: {:?}", e));
         }
       }
       recent_posts.push_str("</ul>");
