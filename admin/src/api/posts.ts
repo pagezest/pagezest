@@ -19,7 +19,7 @@ export const getPost = async (id: string): Promise<Post | null> => {
     headers: {
       ...API_HEADERS,
     },
-  }).then(a => a.json()).then(a => a.data);
+  }).then(a => a.json());
 };
 
 export const createPost = async (post: Omit<Post, 'id' | 'created_at' | 'updated_at'>): Promise<Post> => {

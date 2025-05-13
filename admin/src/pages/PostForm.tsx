@@ -44,10 +44,10 @@ export function PostForm() {
   async function fetchPost(id: string) {
     const post = await getPost(id);
     if(post) {
-      if(typeof(post?.content) === 'string') {
+      if(typeof(post?.content_md) === 'string') {
         post.content = {
-          md: post.content as string,
-          json: lexer(post.content as string),
+          md: post.content_md as string,
+          json: lexer(post.content_md as string),
         };
       }
       form.setValues(post);
