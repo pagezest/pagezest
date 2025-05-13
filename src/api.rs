@@ -82,7 +82,6 @@ pub async fn create_new_blog_post(
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
   let req_json = req_json.into_inner();
-  println!("post: {:?}", req_json);
   let slug = req_json.get("slug")
     .and_then(|v| v.as_str())
     .ok_or_else(|| ErrorInternalServerError(""))?;
@@ -150,7 +149,6 @@ pub async fn get_post_by_slug(
     Some(path) => path.into_inner(),
     None => "_index".to_string(),
   };
-  println!("get_post_by_slug {}", slug);
   let plugin_manager = app_state.plugin_manager.clone();
   let post_data = app_state.posts_fs.get_by_slug(&slug)
       .map_err(|_e| ErrorNotFound(format!("Error: {:?}", _e)))?;
@@ -163,7 +161,7 @@ pub async fn get_post_by_slug(
                 Ok(HttpResponse::Ok().body(resp))
             },
             Err(e) => {
-                println!("render error");
+                println!("render error {:?}", e);
                 Err(ErrorInternalServerError(e))
             }
         }

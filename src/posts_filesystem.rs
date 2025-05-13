@@ -51,7 +51,6 @@ impl PostsFS {
         let entries = self.list()?;
         if let Ok(mut index) = self.index.write() {
             for e in entries {
-                println!("build_index: {} -> {}", e.slug, e.id);
                 index.insert(e.slug, e.id);
             }
         }
@@ -86,7 +85,6 @@ impl PostsFS {
     }
 
     pub fn get(&self, id: &str) -> Result<(BlogPost, Vec<u8>), PostsFSError> {
-        println!("get by id {}", id);
         let metadata = self.get_metadata(id)?;
         let content = fs::read(self.content_path(id))?;
         Ok((metadata, content))
@@ -94,12 +92,10 @@ impl PostsFS {
 
     pub fn get_by_slug(&self, slug: &str) -> Result<Option<(BlogPost, Vec<u8>)>, PostsFSError> {
         if let Ok(index) = self.index.read() {
-            println!("index OK");
             if ! index.contains_key(slug) {
                 return Ok(None);
             }
             let id = index.get(slug).expect("get_by_slug::Unknow error");
-            println!("found slug: {}", id);
             let metadata = self.get_metadata(id)?;
             let content = fs::read(self.content_path(id))?;
             Ok(Some((metadata, content)))
@@ -111,16 +107,13 @@ impl PostsFS {
 
 
     fn get_metadata(&self, id: &str) -> Result<BlogPost, PostsFSError> {
-        println!("get_metadata: {:?}", self.metadata_path(id));
         let file = File::open(self.metadata_path(id))?;
         let metadata = serde_json::from_reader(file)?;
         Ok(metadata)
     }
 
     pub fn insert(&self, metadata: &BlogPost, content: &[u8]) -> Result<(), PostsFSError> {
-        println!("insert {}", metadata.id);
         let path = self.entry_path(&metadata.id);
-        println!("insert path: {:?}", path);
         fs::create_dir_all(&path)?;
 
         let meta_path = self.metadata_path(&metadata.id);
