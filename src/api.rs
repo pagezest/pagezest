@@ -1,10 +1,9 @@
 use actix_web::{error::{ErrorBadRequest, ErrorInternalServerError, ErrorNotFound,}, web::{self, Data}, HttpRequest, HttpResponse, Responder, Result};
-use rusqlite::Connection;
 use rust_embed::Embed;
 use serde_json::{ Value, json };
-use std::sync::{ Arc, Mutex } ;
+use std::{str::FromStr, sync::{ Arc, Mutex }} ;
 
-use crate::{db, memory::get_process_memory, plugin_manager::PluginManager, post::BlogPost, render_flatbuffers::flatbuffers_to_html, AppState};
+use crate::{memory::get_process_memory, plugin_manager::PluginManager, post::BlogPost, render_flatbuffers::flatbuffers_to_html, AppState};
 
 #[derive(Embed)]
 #[folder = "admin/dist/"]
@@ -16,7 +15,6 @@ pub async fn update_blog_post(
   req_json: web::Json<Value>,
 ) -> Result<impl Responder> {
   let req_json = req_json.into_inner();
-  let conn = app_state.conn.lock().unwrap();
   let id = id.into_inner();
 
   let slug = req_json
@@ -34,6 +32,11 @@ pub async fn update_blog_post(
     .cloned()
     .ok_or_else(|| ErrorInternalServerError("content is missing"))?;
 
+    let content_md = content
+    .get("md")
+    .and_then(|v| v.as_str())
+    .ok_or_else(|| ErrorInternalServerError("content.md is missing"))?;
+
     let content_flatbuffer = req_json
         .get("content_flatbuffer64")
     .and_then(|v| v.as_str())
@@ -42,17 +45,11 @@ pub async fn update_blog_post(
     let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
 
 
-    let blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer);
-  // Check if a blog with the given ID exists.
-  if db::get_post(&conn, &id, false)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))
-      ?.is_some() {
-        db::update_post(&conn, blog_post, &id, false)
-          .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-        return Ok(HttpResponse::Ok().json(
-            json!({"msg" : "Updated your Blog Successfully", "success" : true})
-        ));
-  }
+    let blog_post: BlogPost = BlogPost::new(slug, title, content_md, vec![]);
+    app_state.posts_fs.update_metadata(&id, &blog_post)
+        .map_err(|e| ErrorInternalServerError("error saving metadata"))?;
+    app_state.posts_fs.update_content(&id, &content_flatbuffer)
+        .map_err(|e| ErrorInternalServerError("error saving content"))?;
   Ok(HttpResponse::Ok().json(
       json!({"msg": format!("No blog found with id - {}", id), "success" : false})
   ))
@@ -63,25 +60,21 @@ pub async fn find_blog_by_id(
   app_state: Data<AppState>,
   path: web::Path<String>
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let id = path.into_inner();
-  println!("find_blog_by_id: {}", id);
-  let post = db::get_post(&conn, &id, false)
-    .or_else(|e| Err(ErrorNotFound(e.to_string())))?;
-    let post: Value = json!({"data": post});
+  let (post, _) = app_state.posts_fs.get(&id)
+      .map_err(|_e| ErrorNotFound("not found"))?;
     Ok(HttpResponse::Ok().json(post))
 }
 
 pub async fn get_all_blog_posts(
   app_state: Data<AppState>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
-  let posts = db::get_all_post(&conn)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    Ok(HttpResponse::Ok().json(json!({"data" : posts, "success": true})))
+  let posts: Vec<Value> = app_state.posts_fs.list()
+      .map_err(|_e| ErrorInternalServerError("Error"))?
+      .iter().map(|s| s.to_json())
+      .collect();
+  Ok(HttpResponse::Ok().json(json!({"data" : posts, "success": true})))
 }
 
 pub async fn create_new_blog_post(
@@ -90,8 +83,6 @@ pub async fn create_new_blog_post(
 ) -> Result<impl Responder> {
   let req_json = req_json.into_inner();
   println!("post: {:?}", req_json);
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
   let slug = req_json.get("slug")
     .and_then(|v| v.as_str())
     .ok_or_else(|| ErrorInternalServerError(""))?;
@@ -104,6 +95,12 @@ pub async fn create_new_blog_post(
     .cloned()
     .ok_or_else(|| ErrorInternalServerError(""))?;
 
+    let content_md = content
+        .get("md")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| ErrorInternalServerError(""))?;
+
+
     let content_flatbuffer = req_json
       .get("content_flatbuffer64")
       .and_then(|f| f.as_str())
@@ -111,17 +108,13 @@ pub async fn create_new_blog_post(
 
     let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
 
-  let blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer);
+  let blog_post: BlogPost = BlogPost::new(slug, title, content_md, vec![]);
 
   // Check if Blog with given slug already exists or not.
-  let post = db::get_post(&conn, &blog_post.slug, true)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-  if post.is_some() {
-    return Err(ErrorBadRequest("slug already exists"));
-  }
 
-  db::create_post(&conn, blog_post)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+  app_state.posts_fs.insert(&blog_post, &content_flatbuffer)
+      .map_err(|_e| ErrorInternalServerError("Error"))?;
+
   Ok(HttpResponse::Ok().json(json!({"msg" : "New Blog Created Successfully", "success": true})))
 }
 
@@ -130,25 +123,20 @@ pub async fn delete_blog_post(
   path: web::Path<String>
 ) -> Result<impl Responder> {
   let id = path.into_inner();
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-
-  // Check if a blog with the given ID exists.
-  _ = db::get_post(&conn, &id, false)
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    db::delete_post(&conn, &id, false)
-      .map_err(|e| ErrorInternalServerError(e.to_string()))?;
-    Ok(HttpResponse::Ok().json(json!({"msg": "Blog deleted successfully", "success": true})))
+  app_state.posts_fs.delete(&id)
+      .map_err(|_e| ErrorNotFound("not found"))?;
+  Ok(HttpResponse::Ok().json(json!({"msg": "Blog deleted successfully", "success": true})))
 }
 
 
 pub async fn get_server_stats(
   app_state: Data<AppState>,
 ) -> Result<impl Responder> {
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+    /*
   let mut stats = db::get_stats(&conn)
     .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+    */
+    let mut stats = json!({});
   let memory = get_process_memory();
   stats["memory"] = json!(memory);
   Ok(HttpResponse::Ok().json(json!({"data": stats})))
@@ -160,36 +148,35 @@ pub async fn get_post_by_slug(
 ) -> Result<impl Responder> {
   let slug = match path {
     Some(path) => path.into_inner(),
-    None => "".to_string(),
+    None => "_index".to_string(),
   };
-  let conn = app_state.conn.lock()
-    .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+  println!("get_post_by_slug {}", slug);
   let plugin_manager = app_state.plugin_manager.clone();
-  let post = db::get_post(&conn, &slug, true)
-    .map_err(|_e| ErrorNotFound("post not found"))
-    .or_else(|_| Err(ErrorNotFound("post not found")))?;
+  let post_data = app_state.posts_fs.get_by_slug(&slug)
+      .map_err(|_e| ErrorNotFound(format!("Error: {:?}", _e)))?;
+    if let Some((mut post, content)) = post_data {
+        post.content_flatbuffer = content;
 
-  if post.is_none() {
-    return Err(ErrorNotFound("Post not found"));
-  }
-  let post = post.unwrap();
 
-  match render_page(&plugin_manager, &post, &post.content_flatbuffer, &conn) {
-    Ok(resp) => {
-      Ok(HttpResponse::Ok().body(resp))
-    },
-    Err(e) => {
-      println!("render error");
-      Err(ErrorInternalServerError(e))
+        match render_page(&plugin_manager, &post, &post.content_flatbuffer) {
+            Ok(resp) => {
+                Ok(HttpResponse::Ok().body(resp))
+            },
+            Err(e) => {
+                println!("render error");
+                Err(ErrorInternalServerError(e))
+            }
+        }
+    } else {
+        Err(ErrorNotFound(format!("{} Not found", slug)))
     }
-  }
 }
 
-fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &Vec<u8>, conn: &Connection) -> Result<String, std::io::Error> {
+fn render_page(plugin_manager: &Arc<Mutex<PluginManager>>, post: &BlogPost, content: &Vec<u8>) -> Result<String, std::io::Error> {
 
   let mut page_contents = String::new();
   let plugin_manager = plugin_manager.lock().unwrap();
-  match flatbuffers_to_html(post, content, conn, plugin_manager) {
+  match flatbuffers_to_html(post, content, plugin_manager) {
     Ok(s) => {
       page_contents.push_str(&s);
       return Ok(page_contents);
