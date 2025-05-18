@@ -1,53 +1,57 @@
 mod api;
 mod db;
 mod errors;
+mod inmemory_cache;
 mod memory;
-mod plugin;
-mod post;
 mod plugin_manager;
-mod render_flatbuffers;
-mod routes;
+mod post;
 #[allow(dead_code, unused_imports)]
 #[path = "./post_flatbuffers.rs"]
 mod post_flatbuffers;
+mod render_flatbuffers;
+mod routes;
 
-use std::env;
-use std::sync::{Arc, Mutex};
-
-use actix_web::{App, HttpServer, web::Data};
-use plugin_manager::PluginManager;
-use rusqlite::Connection;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{env, sync::RwLock};
 
 use crate::memory::get_process_memory;
-use crate::post::BlogPost;
-
-const POSTS_SEED: &str = include_str!("../assets/posts-seed.json");
+use actix_web::{web::Data, App, HttpServer};
+use db::{DBPool, DBPoolOptions};
+use inmemory_cache::ShardedCache;
+use plugin_manager::PluginManager;
+use post::BlogPost;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub conn: Arc<Mutex<Connection>>,
-    pub plugin_manager: Arc<Mutex<PluginManager>>,
+    pub conn: Arc<DBPool>,
+    pub cache: Arc<ShardedCache<BlogPost>>,
+    pub plugin_manager: Arc<RwLock<PluginManager>>,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+    let num_cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
     let mut host = "0.0.0.0".to_string();
     let mut port = 8080;
     let mut num_workers = num_cpus;
+    let mut db_pool_size = num_cpus;
+    let mut db_cache_size = 1024;
     let mut debug = false;
 
     let args: Vec<String> = env::args().collect();
-    let  mut i = 1;
+    let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
-            "--host" => {
+            "--host" | "-h" => {
                 if i + 1 < args.len() {
                     host = args[i + 1].clone();
                     i += 1;
                 }
             }
-            "--port" => {
+            "--port" | "-p" => {
                 if i + 1 < args.len() {
                     if let Ok(p) = args[i + 1].parse::<u16>() {
                         port = p;
@@ -55,10 +59,26 @@ async fn main() -> std::io::Result<()> {
                     }
                 }
             }
-            "--num_workers" => {
+            "--num_workers" | "-w" => {
                 if i + 1 < args.len() {
                     if let Ok(n) = args[i + 1].parse::<usize>() {
                         num_workers = n;
+                        i += 1;
+                    }
+                }
+            }
+            "--pool_size" | "-c" => {
+                if i + 1 < args.len() {
+                    if let Ok(n) = args[i + 1].parse::<usize>() {
+                        db_pool_size = n;
+                        i += 1;
+                    }
+                }
+            }
+            "--cache_size" | "-z" => {
+                if i + 1 < args.len() {
+                    if let Ok(n) = args[i + 1].parse::<usize>() {
+                        db_cache_size = n;
                         i += 1;
                     }
                 }
@@ -71,8 +91,15 @@ async fn main() -> std::io::Result<()> {
         i += 1;
     }
 
+    println!(
+        "DB options:\n\tworkers: {}\n\tpool_size: {}\n\tcache_size: {}",
+        num_workers, db_pool_size, db_cache_size
+    );
+
     if debug {
-        unsafe {std::env::set_var("RUST_LOG", "debug");}
+        unsafe {
+            std::env::set_var("RUST_LOG", "debug");
+        }
         env_logger::init();
     }
 
@@ -81,39 +108,60 @@ async fn main() -> std::io::Result<()> {
     let m3 = get_process_memory();
     // Run a server.use post::BlogPost;
     //server::run_server(conn)
-    let conn = Connection::open("pagezest.db").expect("Could not open DB");
-    db::init_db(&conn).expect("Could not init DB");
+    //let conn = Connection::open("pagezest.db").expect("Could not open DB");
+
+    let database_url = "sqlite://pagezest.db";
+    let pool = DBPoolOptions::new()
+        .min_connections((db_pool_size >> 1) as u32)
+        .max_connections(db_pool_size as u32)
+        .max_lifetime(Duration::from_secs(60 * 60))
+        .connect(database_url)
+        .await
+        .expect("could not open DB");
+    db::init_db(&pool).await.expect("could not init DB"); //.expect("Could not init DB");
+                                                          //
+    for _ in 0..(db_pool_size) {
+        let mut conn = pool.acquire().await.expect("could not acquire connection");
+        sqlx::query("PRAGMA journal_mode=WAL")
+            .execute(&mut *conn)
+            .await
+            .expect("could not execute journal_mode=WAL");
+        sqlx::query(&format!("PRAGMA cache_size = {};", db_cache_size))
+            .execute(&mut *conn)
+            .await
+            .expect("could not execute cache_size = 1024");
+    }
     let m2 = get_process_memory();
     // If no blogs are there then create one sample blog.
-    if db::get_all_post(&conn).unwrap().is_empty() {
-        let blog_posts: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).unwrap();
-        for blog_post in blog_posts {
-            //db::create_post(&conn, blog_post).unwrap();
+    /*
+        if db::get_all_post(&pool).unwrap().is_empty() {
+            let blog_posts: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).unwrap();
+            for blog_post in blog_posts {
+                //db::create_post(&pool, blog_post).unwrap();
+            }
         }
-    }
-
+    */
     println!("Starting Pagezest Instance");
     println!("Initial Memory at : {} KB", m1);
     println!("DB Initialized Memory : {} KB", m2);
     println!("Sample Post Generated : {} KB", m3);
 
-    let mut plugin_manager = PluginManager::new();
-    plugin_manager.scan_plugins().unwrap();
-
-    let conn = Arc::new(Mutex::new(conn));
-    let plugin_manager = Arc::new(Mutex::new(plugin_manager));
+    let pool = Arc::new(pool);
     HttpServer::new(move || {
+        let mut plugin_manager = PluginManager::new();
+        plugin_manager.scan_plugins().unwrap();
+
+        let plugin_manager = Arc::new(RwLock::new(plugin_manager));
         let data = AppState {
-            conn: conn.clone(),
+            conn: pool.clone(),
+            cache: Arc::new(ShardedCache::new(num_workers)),
             plugin_manager: plugin_manager.clone(),
         };
         let data = Data::new(data);
-        App::new()
-            .app_data(data)
-            .configure(routes::config)
+        App::new().app_data(data).configure(routes::config)
     })
     .workers(num_workers)
-        .bind((host, port))?
-        .run()
-        .await
+    .bind((host, port))?
+    .run()
+    .await
 }
