@@ -21,6 +21,7 @@ use db::{DBPool, DBPoolOptions};
 use inmemory_cache::ShardedCache;
 use plugin_manager::PluginManager;
 use post::BlogPost;
+use rusqlite::Connection;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -108,18 +109,28 @@ async fn main() -> std::io::Result<()> {
     let m3 = get_process_memory();
     // Run a server.use post::BlogPost;
     //server::run_server(conn)
-    //let conn = Connection::open("pagezest.db").expect("Could not open DB");
+    let mut db_path = env::current_dir().unwrap();
+    db_path.push("pagezest.db");
 
-    let database_url = "sqlite://pagezest.db";
+    // workaround for DB file not created automatically, error 14
+    {
+        std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(format!("{}", db_path.display()))
+            .expect("failed to touch db.db");
+    }
+
+    let database_url = format!("sqlite://{}", db_path.display());
+
     let pool = DBPoolOptions::new()
-        .min_connections((db_pool_size >> 1) as u32)
+        .min_connections(0)
         .max_connections(db_pool_size as u32)
-        .max_lifetime(Duration::from_secs(60 * 60))
-        .connect(database_url)
+        .connect(&database_url)
         .await
         .expect("could not open DB");
-    db::init_db(&pool).await.expect("could not init DB"); //.expect("Could not init DB");
-                                                          //
+    db::init_db(&pool).await.expect("could not init DB");
+
     for _ in 0..(db_pool_size) {
         let mut conn = pool.acquire().await.expect("could not acquire connection");
         sqlx::query("PRAGMA journal_mode=WAL")
