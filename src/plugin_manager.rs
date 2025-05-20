@@ -1,32 +1,45 @@
+use crate::{errors::AppError, plugin::Plugin};
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
-    env,
-    error::Error,
-    fs,
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    collections::HashMap, env, error::Error, fs, path::{Path, PathBuf}, sync::{Arc, RwLock}
 };
 
-use serde_json::Value;
-use wasmtime::{Caller, Config, Engine, Instance, Linker, Memory, Module, Store, TypedFunc};
+fn default_manifest_version() -> String {
+    "1.0".to_string()
+}
+fn default_manifest_dynamic() -> bool {
+    false
+}
 
-use crate::errors::AppError;
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PluginManifest {
+    #[serde(default = "default_manifest_version")]
+    manifest_version: String,
+    #[serde(default = "default_manifest_dynamic")]
+    dynamic: bool,
+    name: String,
+    tag: String,
+    wasm_path: String,
+    func_name: String,
+}
 
 pub struct PluginManager {
-    plugins: HashMap<String, Arc<Mutex<Plugin>>>,
+    plugins: HashMap<String, Arc<RwLock<Plugin>>>,
+    cache: RwLock<HashMap<String, String>>
 }
 
 impl PluginManager {
     pub fn new() -> Self {
         Self {
             plugins: HashMap::new(),
+            cache: RwLock::new(HashMap::new())
         }
     }
 
     pub fn load_plugin(&mut self, plugin: Plugin) {
         //let plugin = Plugin::new(name, tag);
         self.plugins
-            .insert(plugin.tag.to_string(), Arc::new(Mutex::new(plugin)));
+            .insert(plugin.tag.to_string(), Arc::new(RwLock::new(plugin)));
     }
 
     pub fn unload_plugin(&mut self, tag: &str) {
@@ -41,11 +54,30 @@ impl PluginManager {
         self.plugins.contains_key(tag)
     }
 
-    pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Arc<Mutex<Plugin>>, AppError> {
+    pub fn get_plugin_by_tag(&mut self, tag: &str) -> Result<&Arc<RwLock<Plugin>>, AppError> {
         match self.plugins.get(tag) {
             Some(plugin) => Ok(plugin),
             _ => Err(AppError::PluginError("Not found".to_string())),
         }
+    }
+
+    pub fn run_plugin(&mut self, tag: &str, slug: &str, input: &Vec<u8>) -> Result<String, Box<dyn Error>> {
+        let plugin = self.plugins.get(tag).ok_or_else(|| format!("No plugin found for {}", tag))?;
+        let mut plugin = plugin.write().map_err(|e| format!("could not lock plugin: {e}"))?;
+        let key = format!("{}__{}", tag, slug);
+        if !plugin.dynamic {
+            let cache = self.cache.read().map_err(|e| format!("cloud not lock cache {e}"))?;
+            if cache.contains_key(&key) {
+                return Ok(cache.get(&key).unwrap().clone());
+            }
+        }
+
+        let res = plugin.call(input)?;
+
+
+        let mut cache_w = self.cache.write().map_err(|e| format!("could not lock cache for write {e}"))?;
+        cache_w.insert(key, res.clone());
+        Ok(res)
     }
 
     pub fn load_plugin_dir(&mut self, path: PathBuf) -> Result<(), Box<dyn Error>> {
@@ -54,31 +86,17 @@ impl PluginManager {
             if manifest_path.exists() {
                 match fs::read_to_string(manifest_path) {
                     Ok(manifest_content) => {
-                        let json: Value = serde_json::from_str(&manifest_content)
-                            .expect("could not parse manifest");
-                        let name = json
-                            .get("name")
-                            .and_then(|s| s.as_str())
-                            .expect("Manifest: name not found")
-                            .to_string();
-                        let tag = json
-                            .get("tag")
-                            .and_then(|s| s.as_str())
-                            .expect("Manifest: tag not found {}")
-                            .to_string();
-                        let wasm_path = json
-                            .get("wasm_path")
-                            .and_then(|s| s.as_str())
-                            .expect("Manifest: wasm_path not found")
-                            .to_string();
-                        let plugin_func_name = json
-                            .get("func_name")
-                            .and_then(|s| s.as_str())
-                            .expect("Manifest: func_name not found")
-                            .to_string();
-                        let wasm_path = path.join(wasm_path);
+                        let manifest: PluginManifest = serde_json::from_str(&manifest_content)?;
+                        println!("manifest: {:?}", manifest);
+                        let wasm_path = path.join(manifest.wasm_path);
                         let wasm_path_str = wasm_path.to_str().unwrap();
-                        match Plugin::new(&name, &tag, wasm_path_str, &plugin_func_name) {
+                        match Plugin::new(
+                            &manifest.name,
+                            &manifest.tag,
+                            wasm_path_str,
+                            &manifest.func_name,
+                            manifest.dynamic,
+                        ) {
                             Ok(plugin) => {
                                 self.load_plugin(plugin);
                                 println!("plugin loaded: {}", path.to_str().unwrap());
@@ -127,93 +145,4 @@ impl PluginManager {
         }
         Ok(())
     }
-}
-
-//#[derive(Debug)]
-pub struct Plugin {
-    name: String,
-    tag: String,
-    wasm_file_path: String,
-    plugin_func_name: String,
-    instance: Instance,
-    memory: Memory,
-    store: Store<()>,
-    plugin_func: TypedFunc<(u32, u32), u32>,
-}
-
-impl Plugin {
-    pub fn new(
-        name: &str,
-        tag: &str,
-        wasm_path: &str,
-        plugin_func_name: &str,
-    ) -> Result<Self, Box<dyn Error>> {
-        let wasm = std::fs::read(wasm_path)?;
-        let mut config = Config::new();
-        config.async_support(false);
-        let engine = Engine::new(&config)?;
-        let module = Module::from_binary(&engine, &wasm)?;
-
-        let mut store = Store::new(&engine, ());
-        let mut linker = Linker::new(&engine);
-
-        linker.func_wrap("env", "abort", abort_stub)?;
-        linker.func_wrap("env", "console.log", console_log_stub)?;
-
-        let instance = linker.instantiate(&mut store, &module)?;
-
-        let memory = instance
-            .get_export(&mut store, "memory")
-            .and_then(|e| e.into_memory())
-            .ok_or("memory export not found")?;
-
-        let plugin_func =
-            instance.get_typed_func::<(u32, u32), u32>(&mut store, plugin_func_name)?;
-
-        Ok(Self {
-            name: name.to_string(),
-            tag: tag.to_string(),
-            wasm_file_path: wasm_path.to_string(),
-            plugin_func_name: plugin_func_name.to_string(),
-            instance,
-            memory,
-            store,
-            plugin_func,
-        })
-    }
-
-    pub fn call(&mut self, input: &Vec<u8>) -> Result<String, Box<dyn Error>> {
-        let offset = 40_000u32;
-        self.memory.write(&mut self.store, offset as usize, input)?;
-
-        let res_ptr = self
-            .plugin_func
-            .call(&mut self.store, (offset, input.len() as u32))?;
-
-        let mut output = Vec::new();
-        let mut curr_ptr = res_ptr;
-        loop {
-            let mut buf = [0u8; 1];
-            self.memory
-                .read(&mut self.store, curr_ptr as usize, &mut buf)?;
-            if buf[0] == 0 {
-                break;
-            }
-            output.push(buf[0]);
-            curr_ptr += 1;
-        }
-
-        Ok(String::from_utf8(output)?)
-    }
-}
-
-fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {
-    println!(
-        "abort: msg: {}, file: {}, line: {}, col: {}",
-        _msg_ptr, _file_ptr, _line, _col
-    );
-}
-
-fn console_log_stub(_caller: Caller<'_, ()>, _msg_ptr: i32) {
-    println!("console.log called");
 }
