@@ -3,30 +3,30 @@ mod db;
 mod errors;
 mod inmemory_cache;
 mod memory;
+mod plugin;
 mod plugin_manager;
 mod post;
-#[allow(dead_code, unused_imports)]
+#[allow(warnings, dead_code, unused_imports)]
 #[path = "./post_flatbuffers.rs"]
 mod post_flatbuffers;
 mod render_flatbuffers;
 mod routes;
 
 use std::sync::Arc;
-use std::time::Duration;
 use std::{env, sync::RwLock};
 
 use crate::memory::get_process_memory;
+use actix::{Actor, Addr};
 use actix_web::{web::Data, App, HttpServer};
 use db::{DBPool, DBPoolOptions};
 use inmemory_cache::ShardedCache;
 use plugin_manager::PluginManager;
 use post::BlogPost;
-use rusqlite::Connection;
 
 #[derive(Clone)]
 pub struct AppState {
     pub conn: Arc<DBPool>,
-    pub cache: Arc<ShardedCache<BlogPost>>,
+    pub cache: Arc<Addr<ShardedCache<BlogPost>>>,
     pub plugin_manager: Arc<RwLock<PluginManager>>,
 }
 
@@ -163,9 +163,10 @@ async fn main() -> std::io::Result<()> {
         plugin_manager.scan_plugins().unwrap();
 
         let plugin_manager = Arc::new(RwLock::new(plugin_manager));
+        let cache: Addr<ShardedCache<BlogPost>> = ShardedCache::new(1).start();
         let data = AppState {
             conn: pool.clone(),
-            cache: Arc::new(ShardedCache::new(num_workers)),
+            cache: Arc::new(cache),
             plugin_manager: plugin_manager.clone(),
         };
         let data = Data::new(data);
