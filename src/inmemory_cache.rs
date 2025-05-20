@@ -1,3 +1,4 @@
+use actix::{prelude::Handler, Actor, Context, Message};
 use std::collections::HashMap;
 use std::sync::RwLock;
 
@@ -26,10 +27,10 @@ impl<T: Clone> ShardedCache<T> {
         Self::hash(key) % self.shards.len()
     }
 
-    pub fn set(&self, key: String, value: T) {
-        let shard_idx = self.get_shard(&key);
+    pub fn set(&self, key: &String, value: T) {
+        let shard_idx = self.get_shard(key);
         let mut shard = self.shards[shard_idx].write().unwrap();
-        shard.insert(key, value);
+        shard.insert(key.to_string(), value);
     }
 
     pub fn get(&self, key: &str) -> Option<T> {
@@ -48,5 +49,40 @@ impl<T: Clone> ShardedCache<T> {
         let shard_idx = self.get_shard(key);
         let mut shard = self.shards[shard_idx].write().unwrap();
         shard.remove(key)
+    }
+}
+
+pub enum CacheSet<T> {
+    Insert { key: String, value: T },
+    Remove { key: String },
+    Get { key: String },
+}
+
+impl<T: Clone + 'static> Message for CacheSet<T> {
+    type Result = Option<T>;
+}
+
+impl<T: Clone + Send + 'static + Unpin> Message for ShardedCache<T> {
+    type Result = Option<T>;
+}
+
+impl<T: Clone + Send + 'static + Unpin> Actor for ShardedCache<T> {
+    type Context = Context<Self>;
+}
+
+impl<T: Clone + Send + 'static + Unpin> Handler<CacheSet<T>> for ShardedCache<T> {
+    type Result = Option<T>;
+    fn handle(&mut self, msg: CacheSet<T>, ctx: &mut Self::Context) -> Self::Result {
+        match msg {
+            CacheSet::Insert { key, value } => {
+                self.set(&key, value);
+                None
+            }
+            CacheSet::Remove { key } => {
+                self.remove(&key);
+                None
+            }
+            CacheSet::Get { key } => self.get(&key),
+        }
     }
 }
