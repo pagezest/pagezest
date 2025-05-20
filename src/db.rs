@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use crate::{inmemory_cache::ShardedCache, post::BlogPost};
+use crate::post::BlogPost;
 use rusqlite::Result;
 use sqlx::{pool::PoolOptions, query, sqlite::SqliteQueryResult, Error, Pool, Row, Sqlite};
 
@@ -83,25 +81,6 @@ pub async fn get_post_by_id(conn: &DBPool, id: &str) -> Result<Option<BlogPost>,
         vec![],
         //row.get("content_flatbuffer"),
     )))
-}
-
-pub async fn get_post_by_slug_cached(
-    conn: &DBPool,
-    cache: &Arc<ShardedCache<BlogPost>>,
-    slug: &str,
-) -> Result<Option<BlogPost>, Error> {
-    if cache.has(slug) {
-        return Ok(cache.get(slug));
-    }
-    let post = get_post_by_slug(conn, slug).await?;
-
-    match post {
-        Some(post) => {
-            cache.set(slug.to_string(), post.clone());
-            Ok(Some(post))
-        }
-        _ => Ok(None),
-    }
 }
 
 pub async fn get_post_by_slug(conn: &DBPool, slug: &str) -> Result<Option<BlogPost>, Error> {
