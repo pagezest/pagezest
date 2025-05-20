@@ -4,11 +4,13 @@ use actix_web::{
     HttpRequest, HttpResponse, Responder, Result,
 };
 use rust_embed::Embed;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 
 use crate::{
     db::{self, DBPool},
+    inmemory_cache::CacheSet,
     plugin_manager::PluginManager,
     post::BlogPost,
     render_flatbuffers::{flatbuffers_prerender, flatbuffers_to_html},
@@ -19,47 +21,43 @@ use crate::{
 #[folder = "admin/dist/"]
 struct Asset;
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlogPostInput {
+    slug: String,
+    title: String,
+    content: String,
+    content_flatbuffer64: String,
+}
+
 pub async fn update_blog_post(
     app_state: Data<AppState>,
     id: web::Path<String>,
-    req_json: web::Json<serde_json::Value>,
+    req_json: web::Json<BlogPostInput>,
 ) -> Result<impl Responder> {
     let req_json = req_json.into_inner();
     let id = id.into_inner();
 
-    let slug = req_json
-        .get("slug")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| ErrorInternalServerError("slug is missing"))?;
-
-    let title = req_json
-        .get("title")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| ErrorInternalServerError("title is missing"))?;
-
-    let content = req_json
-        .get("content")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| ErrorInternalServerError("content is missing"))?;
-
-    let content_flatbuffer = req_json
-        .get("content_flatbuffer64")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| ErrorInternalServerError("flatbuffer64 is missing"))?;
-
-    if content_flatbuffer.len() == 0 {
+    if req_json.content_flatbuffer64.len() == 0 {
         return Err(ErrorBadRequest("content_flatbuffer64 is missing"));
     }
 
-    let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
+    #[allow(deprecated)]
+    let content_flatbuffer =
+        base64::decode(req_json.content_flatbuffer64).expect("Failed to decode Base64");
 
-    println!("update...{}", content_flatbuffer.len());
+    app_state.cache.do_send(CacheSet::Remove {
+        key: req_json.slug.clone(),
+    });
 
-    let mut blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer.clone());
+    let mut blog_post: BlogPost = BlogPost::new(
+        &req_json.slug,
+        &req_json.title,
+        &req_json.content,
+        content_flatbuffer.clone(),
+    );
     let content_cached = flatbuffers_prerender(&blog_post, &content_flatbuffer)?;
     blog_post.content_cached = content_cached;
 
-    app_state.cache.remove(slug);
     // Check if a blog with the given ID exists.
     if db::get_post_by_id(&app_state.conn, &id)
         .await
@@ -152,7 +150,9 @@ pub async fn delete_blog_post(
         .map_err(|e| ErrorInternalServerError(e.to_string()))?;
 
     if post.is_some() {
-        app_state.cache.remove(&post.unwrap().slug);
+        app_state.cache.do_send(CacheSet::Remove {
+            key: post.unwrap().slug,
+        });
     }
     db::delete_post(&app_state.conn, &id, false)
         .await
@@ -182,21 +182,30 @@ pub async fn get_post_by_slug(
         Some(path) => path.into_inner(),
         None => "".to_string(),
     };
-    //let conn = app_state.conn.lock()
-    //  .map_err(|e| ErrorInternalServerError(e.to_string()))?;
+
     let conn = app_state.conn.clone();
     let plugin_manager = app_state.plugin_manager.clone();
-    let post = db::get_post_by_slug_cached(&conn, &app_state.cache, &slug)
+
+    let post = match app_state
+        .cache
+        .send(CacheSet::Get { key: slug.clone() })
         .await
-        .map_err(|_e| ErrorNotFound("post not found"))?;
-    //.or_else(|_| Err(ErrorNotFound("post not found")))?;
+    {
+        Ok(Some(post)) => post,
+        _ => {
+            let post = db::get_post_by_slug(&conn, &slug)
+                .await
+                .map_err(|_| ErrorNotFound("Post not found"))?
+                .ok_or_else(|| ErrorNotFound("Post not found"))?;
+            app_state.cache.do_send(CacheSet::Insert {
+                key: slug.clone(),
+                value: post.clone(),
+            });
+            post
+        }
+    };
 
-    if post.is_none() {
-        return Err(ErrorNotFound("Post not found"));
-    }
-    let post = post.unwrap();
-
-    match render_page(&plugin_manager, &post, &post.content_cached, &conn) {
+    match render_page(&plugin_manager, &post, &post.content_cached, &conn).await {
         Ok(resp) => Ok(HttpResponse::Ok().body(resp)),
         Err(e) => {
             println!("render error");
@@ -205,14 +214,14 @@ pub async fn get_post_by_slug(
     }
 }
 
-fn render_page(
+async fn render_page(
     plugin_manager: &Arc<RwLock<PluginManager>>,
     post: &BlogPost,
     content: &Vec<u8>,
     conn: &DBPool,
 ) -> Result<String, std::io::Error> {
     let mut page_contents = String::new();
-    match flatbuffers_to_html(post, content, conn, plugin_manager) {
+    match flatbuffers_to_html(post, content, conn, plugin_manager).await {
         Ok(s) => {
             page_contents.push_str(&s);
             return Ok(page_contents);
