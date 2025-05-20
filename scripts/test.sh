@@ -9,6 +9,8 @@ test_ui() {
   cd $TOP/admin
   npm install
   npm run build
+  rm -rf $TOP/build/pz-admin
+  cp -r dist $TOP/build/pz-admin
 }
 
 test_backend() {
@@ -16,7 +18,6 @@ test_backend() {
   cargo build --release
   cp $TOP/target/release/pagezest $TOP/build/
   cd $TOP/build/
-  rm -rf $TOP/build/pagezest.db
   ./pagezest
 }
 
@@ -25,6 +26,7 @@ test_plugins() {
   mkdir -p $TOP/build/plugins/toc-zig
   mkdir -p $TOP/build/plugins/toc-rust
   mkdir -p $TOP/build/plugins/footer
+  mkdir -p $TOP/build/plugins/time
 
   cd $TOP/plugins/toc-zig
   zig build -p . --prefix-exe-dir .
@@ -37,6 +39,12 @@ test_plugins() {
   rm -rf $TOP/build/plugins/toc-rust/*
   cp -r $TOP/plugins/toc-rust/manifest.json $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm $TOP/build/plugins/toc/toc.wasm
+
+  cd $TOP/plugins/time
+  cargo build --release --target wasm32-unknown-unknown
+  rm -rf $TOP/build/plugins/time/*
+  cp -r $TOP/plugins/time/manifest.json $TOP/build/plugins/time/
+  cp -r $TOP/plugins/time/target/wasm32-unknown-unknown/release/time.wasm $TOP/build/plugins/time/time.wasm
 
   cd $TOP/plugins/footer
   cargo build --release --target wasm32-unknown-unknown
