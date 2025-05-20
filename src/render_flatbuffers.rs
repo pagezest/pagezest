@@ -7,7 +7,7 @@ use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
 use serde::de::Error;
 
 use crate::{
-    db::DBPool,
+    db::{self, DBPool},
     plugin_manager::PluginManager,
     post::BlogPost,
     post_flatbuffers::pagezest_markdown::{
@@ -41,7 +41,7 @@ fn html_escape(input: &str) -> String {
 }
 
 pub fn flatbuffers_prerender(
-    post: &BlogPost,
+    _post: &BlogPost,
     fb_input: &Vec<u8>,
 ) -> Result<Vec<u8>, serde_json::Error> {
     let doc = root_as_document(&fb_input).map_err(|e| serde_json::Error::custom(e.to_string()))?;
@@ -131,7 +131,7 @@ pub fn flatbuffers_prerender(
     Ok(fbb.finished_data().to_vec())
 }
 
-pub fn flatbuffers_to_html(
+pub async fn flatbuffers_to_html(
     post: &BlogPost,
     fb_input: &Vec<u8>,
     conn: &DBPool,
@@ -149,7 +149,7 @@ pub fn flatbuffers_to_html(
     html.push_str("<body>");
     if let Some(tokens) = doc.tokens() {
         for node in tokens {
-            html.push_str(&render_token(&node, &doc, post, conn, plugin_manager));
+            html.push_str(&render_token(&node, &doc, post, conn, plugin_manager).await);
         }
     }
     html.push_str("</body>");
@@ -247,8 +247,8 @@ fn pre_render_token(token: &Token) -> RenderTokenResult {
     };
 }
 
-fn render_token(
-    token: &Token,
+async fn render_token(
+    token: &Token<'_>,
     root: &Document<'_>,
     post: &BlogPost,
     conn: &DBPool,
@@ -258,7 +258,7 @@ fn render_token(
         TokenType::PARAGRAPH => {
             let paragraph = token.value_as_paragraph().unwrap();
             if let Some(custom) =
-                try_handle_custom_tag(paragraph.text(), root, post, conn, plugin_manager)
+                try_handle_custom_tag(paragraph.text(), root, post, conn, plugin_manager).await
             {
                 return custom;
             } else {
@@ -351,7 +351,8 @@ fn is_custom_tag(text: &str) -> bool {
     }
     false
 }
-fn try_handle_custom_tag(
+
+async fn try_handle_custom_tag(
     text: &str,
     root: &Document<'_>,
     post: &BlogPost,
@@ -366,15 +367,18 @@ fn try_handle_custom_tag(
             let close_tag = format!("[[/{}]]", tag_name);
             if let Some(close_start) = trimmed.find(&close_tag) {
                 let content = &trimmed[end + 2..close_start];
-                return Some(handle_custom_tag(
-                    &tag_name,
-                    content,
-                    attributes,
-                    root,
-                    post,
-                    conn,
-                    plugin_manager,
-                ))?;
+                return Some(
+                    handle_custom_tag(
+                        &tag_name,
+                        content,
+                        attributes,
+                        root,
+                        post,
+                        conn,
+                        plugin_manager,
+                    )
+                    .await,
+                )?;
             }
         }
     }
@@ -447,11 +451,11 @@ fn parse_tag_and_attributes(tag: &str) -> (String, HashMap<String, String>) {
     (tag_name, attributes)
 }
 
-fn handle_custom_tag(
+async fn handle_custom_tag(
     tag: &str,
     content: &str,
-    attribs: HashMap<String, String>,
-    root: &Document<'_>,
+    _attribs: HashMap<String, String>,
+    _root: &Document<'_>,
     post: &BlogPost,
     conn: &DBPool,
     plugin_manager: &Arc<RwLock<PluginManager>>,
@@ -464,51 +468,33 @@ fn handle_custom_tag(
         let mut recent_posts = String::new();
         recent_posts.push_str("<h1>Recent Posts</h1>");
         recent_posts.push_str("<ul>");
-        /*
-        match db::get_all_post(&conn) {
-          Ok(posts) => {
-              for post in posts {
-                  let slug = post.get("slug").and_then(|s| s.as_str()).unwrap();
-                  let title = post.get("title").and_then(|s| s.as_str()).unwrap();
-                  let created_at = post.get("created_at").and_then(|s| s.as_str()).unwrap();
-                  if slug == "" {
-                      continue;
-                  }
-                  recent_posts.push_str(&format!(
-                          "<li><a href='/{}'> {} | {} </a></li>",
-                          html_escape(&slug),
-                          html_escape(&title),
-                          html_escape(&created_at),
-                          ));
-              }
-          },
-          Err(e) => {
-              recent_posts.push_str(&format!("Error getting posts: {}", e.to_string()));
-          }
+        match db::get_all_post(&conn).await {
+            Ok(posts) => {
+                for post in posts {
+                    if post.slug == "" {
+                        continue;
+                    }
+                    recent_posts.push_str(&format!(
+                        "<li><a href='/{}'> {} | {} </a></li>",
+                        html_escape(&post.slug),
+                        html_escape(&post.title),
+                        html_escape(&post.created_at),
+                    ));
+                }
+            }
+            Err(e) => {
+                recent_posts.push_str(&format!("Error getting posts: {}", e.to_string()));
+            }
         }
-        */
         recent_posts.push_str("</ul>");
         return Some(recent_posts.to_string());
     }
 
     let mut plugin_manager = plugin_manager.write().unwrap();
-    if plugin_manager.has_plugin_handler(tag) {
-        match plugin_manager.get_plugin_by_tag(tag) {
-            Ok(func) => {
-                let mut func = func.lock().unwrap();
-                match func.call(&post.content_flatbuffer) {
-                    Ok(v) => return Some(v),
-                    Err(e) => {
-                        println!("plugin call error: {}", e.to_string());
-                        return Some("Plugin error".to_string());
-                    }
-                }
-            }
-            _ => return Some("could not call function".to_string()),
-        }
+    match plugin_manager.run_plugin(tag, &post.slug, &post.content_flatbuffer) {
+        Ok(resp) => Some(resp),
+        Err(e) => format!("plugin error {e}").into(),
     }
-    println!("no handler for: {}", tag);
-    Some(format!("custom tag[{}]: {}", tag, html_escape(content)))
 }
 
 fn render_inlines(tokens: Vector<'_, ForwardsUOffset<Token<'_>>>) -> String {
