@@ -71,16 +71,19 @@ pub async fn get_post_by_id(conn: &DBPool, id: &str) -> Result<Option<BlogPost>,
         FROM posts WHERE id = ?1
         "#;
 
-    let row = query(qry).bind(id).fetch_one(&*conn).await?;
+    let row = query(qry).bind(id).fetch_optional(&*conn).await?;
 
-    Ok(Some(BlogPost::new_with_id(
-        row.get("id"),
-        row.get("slug"),
-        row.get("title"),
-        row.get::<&str, &str>("content"),
-        vec![],
-        //row.get("content_flatbuffer"),
-    )))
+    let res = match row {
+        Some(row) => Some(BlogPost::new_with_id(
+            row.get("id"),
+            row.get("slug"),
+            row.get("title"),
+            row.get::<&str, &str>("content"),
+            vec![],
+        )),
+        _ => None,
+    };
+    Ok(res)
 }
 
 pub async fn get_post_by_slug(conn: &DBPool, slug: &str) -> Result<Option<BlogPost>, Error> {
@@ -89,18 +92,22 @@ pub async fn get_post_by_slug(conn: &DBPool, slug: &str) -> Result<Option<BlogPo
         FROM posts WHERE slug = ?1
         "#;
 
-    let row = query(qry).bind(slug).fetch_one(&*conn).await?;
+    let row = query(qry).bind(slug).fetch_optional(&*conn).await?;
 
-    Ok(Some(BlogPost {
-        id: row.get("id"),
-        slug: row.get("slug"),
-        title: row.get("title"),
-        content: "".to_string(),
-        content_cached: row.get("content_cached"),
-        content_flatbuffer: row.get("content_flatbuffer"),
-        created_at: row.get("created_at"),
-        updated_at: row.get("updated_at"),
-    }))
+    let res = match row {
+        Some(row) => Some(BlogPost {
+            id: row.get("id"),
+            slug: row.get("slug"),
+            title: row.get("title"),
+            content: "".to_string(),
+            content_cached: row.get("content_cached"),
+            content_flatbuffer: row.get("content_flatbuffer"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        }),
+        _ => None,
+    };
+    Ok(res)
 }
 
 pub async fn update_post(
