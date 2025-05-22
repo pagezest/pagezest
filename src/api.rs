@@ -96,9 +96,10 @@ pub async fn get_all_blog_posts(app_state: Data<AppState>) -> Result<impl Respon
 
 pub async fn create_new_blog_post(
     app_state: Data<AppState>,
-    req_json: web::Json<serde_json::Value>,
+    req_json: web::Json<BlogPostInput>,
 ) -> Result<impl Responder> {
     let req_json = req_json.into_inner();
+    /*
     let slug = req_json
         .get("slug")
         .and_then(|v| v.as_str())
@@ -117,11 +118,19 @@ pub async fn create_new_blog_post(
         .get("content_flatbuffer64")
         .and_then(|f| f.as_str())
         .ok_or_else(|| ErrorInternalServerError(""))?;
+    */
 
-    let content_flatbuffer = base64::decode(content_flatbuffer).expect("Failed to decode Base64");
+    #[allow(deprecated)]
+    let content_flatbuffer =
+        base64::decode(req_json.content_flatbuffer64).expect("Failed to decode Base64");
 
-    let mut blog_post: BlogPost = BlogPost::new(slug, title, content, content_flatbuffer);
-    let content_cached = flatbuffers_prerender(&blog_post, &blog_post.content_flatbuffer.clone())?;
+    let mut blog_post: BlogPost = BlogPost::new(
+        &req_json.slug,
+        &req_json.title,
+        &req_json.content,
+        content_flatbuffer.clone(),
+    );
+    let content_cached = flatbuffers_prerender(&blog_post, &content_flatbuffer)?;
 
     // Check if Blog with given slug already exists or not.
     let post = db::get_post_by_slug(&app_state.conn, &blog_post.slug)
