@@ -8,6 +8,7 @@ pub struct BlogPost {
     pub content: String,
     #[serde(skip)]
     pub content_flatbuffer: Vec<u8>,
+    #[serde(skip)]
     pub content_cached: Vec<u8>,
     pub slug: String,
     pub created_at: String,
