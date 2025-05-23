@@ -12,7 +12,7 @@ Do steps 1-3. You need all steps working in order for the server to work.
 
 # Measuring requests per second of server
 
-Just run Apache Benchmark: `ab -n 1000 -c 40 "http://127.0.0.1:8080/hello-world`
+Just run Apache Benchmark: `ab -n 15000 -c 1000 "http://$IP:8080/hello-world"`
 
 # Measuring RSS/RAM usage of server
 
