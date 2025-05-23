@@ -31,6 +31,7 @@ test_plugins() {
   cd $TOP/plugins/toc-rust
   cargo build --release --target wasm32-unknown-unknown
   rm -rf $TOP/build/plugins/toc-rust/*
+  mkdir -p $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc-rust/manifest.json $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm $TOP/build/plugins/toc/toc.wasm
 
