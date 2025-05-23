@@ -611,6 +611,7 @@ fn render_inlines(tokens: Vector<'_, ForwardsUOffset<Token<'_>>>) -> String {
                     format!("<{tag}>\n{items_html}\n</{tag}>\n")
                 }
                 TokenType::HR => "<hr/>".to_string(),
+                TokenType::BR => "<br/>".to_string(),
                 TokenType::LIST_ITEM => "<h1>LIST ITEM</h1>".to_string(),
                 TokenType::PARAGRAPH => {
                     let paragraph = token.value_as_paragraph().unwrap();
