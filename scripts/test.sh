@@ -28,12 +28,6 @@ test_plugins() {
   mkdir -p $TOP/build/plugins/footer
   mkdir -p $TOP/build/plugins/time
 
-  cd $TOP/plugins/toc-zig
-  zig build -p . --prefix-exe-dir .
-  rm -rf $TOP/build/plugins/toc-zig/*
-  cp -r $TOP/plugins/toc-zig/manifest.json $TOP/build/plugins/toc-zig/
-  cp -r $TOP/plugins/toc-zig/toc.wasm $TOP/build/plugins/toc-zig/
-
   cd $TOP/plugins/toc-rust
   cargo build --release --target wasm32-unknown-unknown
   rm -rf $TOP/build/plugins/toc-rust/*
