@@ -131,6 +131,8 @@ async fn main() -> std::io::Result<()> {
         .expect("could not open DB");
     db::init_db(&pool).await.expect("could not init DB");
 
+    db::seed_db(&pool).await.expect("could not seed DB");
+
     for _ in 0..(db_pool_size) {
         let mut conn = pool.acquire().await.expect("could not acquire connection");
         sqlx::query("PRAGMA journal_mode=WAL")

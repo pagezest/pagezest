@@ -1,10 +1,19 @@
 use crate::post::BlogPost;
 use rusqlite::Result;
-use sqlx::{pool::PoolOptions, query, sqlite::SqliteQueryResult, Error, Pool, Row, Sqlite};
+use sqlx::{error::DatabaseError, pool::PoolOptions, query, sqlite::SqliteQueryResult, Error, Pool, Row, Sqlite};
 
 pub type DBPool = Pool<Sqlite>;
 pub type DBPoolOptions = PoolOptions<Sqlite>;
 pub type DBQueryResult = SqliteQueryResult;
+
+const POSTS_SEED: &str = include_str!("../assets/posts-seed.json");
+
+const POSTS_DATA: [&'static [u8]; 4] = [
+    include_bytes!("../assets/content_flatbuffer-1.bin"),
+    include_bytes!("../assets/content_cached-1.bin"),
+    include_bytes!("../assets/content_flatbuffer-2.bin"),
+    include_bytes!("../assets/content_cached-2.bin"),
+];
 
 pub async fn init_db(conn: &DBPool) -> Result<DBQueryResult, Error> {
     let table_creation = r#"
@@ -145,6 +154,25 @@ pub async fn delete_post(conn: &DBPool, id: &str, by_slug: bool) -> Result<DBQue
     };
     query(delete_post_query).bind(id).execute(&*conn).await
 }
+
+pub async fn seed_db(conn: &DBPool) -> Result<(), Error> {
+    let res = query("SELECT COUNT(*) AS num_posts FROM posts")
+        .fetch_one(&*conn).await?;
+    let num_posts: i32 = res.get("num_posts");
+    if num_posts == 0 {
+
+        let posts_data: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).expect("could not parse posts seed file");
+        let mut i = 0;
+        for mut post in posts_data {
+            post.content_flatbuffer = POSTS_DATA[i].to_vec();
+            post.content_cached = POSTS_DATA[i + 1].to_vec();
+            create_post(conn, post).await?;
+            i += 2;
+        }
+    }
+    Ok(())
+}
+
 /*
 
 pub fn get_stats(conn: &DBPool) -> Result<Value> {
