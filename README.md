@@ -2,7 +2,6 @@
 
 Installation Requirements:
 * Rust toolchain (rustc, cargo): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-* Zig (zig): `sudo snap install zig --classic --beta`
 * libsqlite: `apt install libsqlite3-dev`
 
 Do steps 1-3. You need all steps working in order for the server to work.

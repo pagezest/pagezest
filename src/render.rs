@@ -1,7 +1,7 @@
-use std::{collections::HashMap, sync::{Arc, Mutex, MutexGuard}};
+use std::{collections::HashMap, sync::MutexGuard};
 
 use rusqlite::Connection;
-use serde::{ser, Deserialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{db, plugin_manager::PluginManager, post::BlogPost};
@@ -54,6 +54,7 @@ enum Block {
     ordered: bool,
     items: Vec<ListItem>,
   },
+  #[allow(dead_code)]
   #[serde(rename = "list_item")]
   ListItem {
     text: String,
@@ -85,6 +86,7 @@ enum Block {
   Other,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct ListItem {
   text: String,
@@ -98,12 +100,7 @@ pub struct TableCell {
   text: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct TableRow {
-  cells: Vec<TableCell>,
-}
-
-pub fn json_to_html(post: &BlogPost, json_input: &str, mut conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
+pub fn json_to_html(post: &BlogPost, json_input: &str, conn: &Connection, mut plugin_manager: MutexGuard<'_, PluginManager>) -> Result<String, serde_json::Error> {
   let root: Value = serde_json::from_str(json_input).unwrap();
   let blocks: Vec<Block> = serde_json::from_str(json_input)?;
   let mut html = String::new();
@@ -150,7 +147,7 @@ fn render_block(block: &Block, root: &Value, conn: &Connection, plugin_manager: 
         format!("<{tag}>\n{items_html}\n</{tag}>\n")
     }
     Block::ListItem { tokens, task, .. } => {
-        if let Some(task) = task {
+        if let Some(_task) = task {
             println!("task");
             return format!("<li><input type=\"checkbox\">{}</li>\n", render_inlines(tokens))
         }

@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "name": "time",
+  "tag": "time",
+  "wasm_path": "time.wasm",
+  "func_name": "time",
+  "dynamic": true
+}
+

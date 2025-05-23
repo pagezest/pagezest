@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Post } from '../types';
 import { lexer, TokensList } from 'marked';
 import { getPost } from '@/api/posts';
+import { buildFlatBufferFromJson } from '@/buffers/json-to-flatbuffers';
 
 window.lexer = lexer;
 export function PostForm() {
@@ -17,10 +18,8 @@ export function PostForm() {
   const [initialValues, setInitialValues] = useState<Partial<Post>>({
     title: '',
     slug: '',
-    content: {
-      md: '',
-      json: undefined,
-    },
+    content: '',
+    content_flatbuffer64: '',
     author: user?.name || '',
   });
 
@@ -43,16 +42,20 @@ export function PostForm() {
     const post = await getPost(id);
     if(post) {
       if(typeof(post?.content) === 'string') {
-        post.content = {
-          md: post.content as string,
-          json: lexer(post.content as string),
-        };
+        post.content = post.content as string;
       }
       form.setValues(post);
     }
   }
 
   const handleSubmit = async (values: typeof initialValues) => {
+    const json = lexer(values.content);
+    const flatbuffer = buildFlatBufferFromJson(json);
+    const flatbuffer64 = btoa(String.fromCharCode(...flatbuffer));
+    values = {
+      ...values,
+      content_flatbuffer64: flatbuffer64,
+    } as Omit<Post, 'id' | 'createdAt' | 'updatedAt'>;
     try {
       if (id) {
         await updatePost(id, values);
@@ -68,12 +71,11 @@ export function PostForm() {
   function updateContent(e: ChangeEventHandler<HTMLTextAreaElement>) {
     const value = e.target.value as string;
     const json = lexer(value);
-    console.log(json);
+    const flatbuffer = buildFlatBufferFromJson(json);
+    const flatbuffer64 = btoa(String.fromCharCode(...flatbuffer));
     form.setValues({
-      content: {
-        md: value,
-        json,
-      },
+      content: value,
+      content_flatbuffer64: flatbuffer64,
     });
   }
 
@@ -101,7 +103,7 @@ export function PostForm() {
           minRows={10}
           rows={8}
           className="mb-4"
-          {...form.getInputProps('content.md')}
+          {...form.getInputProps('content')}
           onChange={updateContent}
         />
 

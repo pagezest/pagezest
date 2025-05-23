@@ -1,138 +1,139 @@
 use crate::post::BlogPost;
-use rusqlite::{Connection, Result};
-use serde_json::{Value, json};
+use rusqlite::Result;
+use sqlx::{pool::PoolOptions, query, sqlite::SqliteQueryResult, Error, Pool, Row, Sqlite};
 
-pub fn init_db(conn: &Connection) -> Result<()> {
+pub type DBPool = Pool<Sqlite>;
+pub type DBPoolOptions = PoolOptions<Sqlite>;
+pub type DBQueryResult = SqliteQueryResult;
+
+pub async fn init_db(conn: &DBPool) -> Result<DBQueryResult, Error> {
     let table_creation = r#"
     CREATE TABLE IF NOT EXISTS posts (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
         content TEXT NOT NULL,
+        content_flatbuffer BLOB NOT NULL,
+        content_cached BLOB NULL,
         slug TEXT NOT NULL UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     "#;
-    conn.execute(table_creation, [])?;
-    Ok(())
+    query(table_creation).execute(&*conn).await
 }
 
-pub fn create_post(conn: &Connection, blog_post: BlogPost) -> Result<()> {
+pub async fn create_post(conn: &DBPool, blog_post: BlogPost) -> Result<DBQueryResult, Error> {
     let create_post_query = r#"
-        INSERT INTO posts(slug, title, content)
-        VALUES (?, ?, ?)
+        INSERT INTO posts(slug, title, content, content_flatbuffer, content_cached)
+        VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(slug) DO NOTHING
     "#;
     let content_str = blog_post.content.to_string();
-    let params = [blog_post.slug, blog_post.title, content_str];
-    conn.execute(create_post_query, params)?;
-    Ok(())
+    query(create_post_query)
+        .bind(blog_post.slug)
+        .bind(blog_post.title)
+        .bind(content_str)
+        .bind(blog_post.content_flatbuffer)
+        .bind(blog_post.content_cached)
+        .execute(&*conn)
+        .await
 }
 
-pub fn get_all_post(conn: &Connection) -> Result<Vec<Value>> {
+/*
+*/
+pub async fn get_all_post(conn: &DBPool) -> Result<Vec<BlogPost>, Error> {
     let fetch_all_post_query = r#"
         SELECT id, slug, title, created_at, updated_at
         FROM posts
         ORDER BY created_at DESC
     "#;
 
-    let mut stmt = conn.prepare(fetch_all_post_query)?;
-    let rows = stmt.query_map([], |row| {
-        let id: i32 = row.get(0)?;
-        let slug: String = row.get(1)?;
-        let title: String = row.get(2)?;
-        let created_at: String = row.get(3)?;
-        let updated_at: String = row.get(4)?;
-        Ok(json!({
-            "id": id,
-            "slug": slug,
-            "title": title,
-            "created_at": created_at,
-            "updated_at": updated_at
-        }))
-    })?;
+    let rows = query(fetch_all_post_query).fetch_all(&*conn).await?;
 
-    let mut posts = Vec::new();
-    for row in rows {
-        posts.push(row?);
-    }
-    Ok(posts)
-}
-
-pub fn get_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result<Option<BlogPost>> {
-    let query = if by_slug {
-        r#"
-        SELECT slug, title, content, created_at, updated_at
-        FROM posts WHERE slug = ?1
-        "#
-    } else {
-        r#"
-        SELECT slug, title, content, created_at, updated_at
-        FROM posts WHERE id = ?1
-        "#
-    };
-
-    let mut stmt = conn.prepare(query)?;
-
-    let mut rows = stmt.query_map([identifier], |row| {
-        let slug: String = row.get(0)?;
-        let title: String = row.get(1)?;
-        let content_str: String = row.get(2)?;
-        let content_json: Value = serde_json::from_str(&content_str).unwrap();
-        let created_at: String = row.get(3)?;
-        let updated_at: String = row.get(4)?;
-        Ok(BlogPost {
-            slug,
-            title,
-            content: content_json,
-            created_at,
-            updated_at,
+    Ok(rows
+        .iter()
+        .map(|row| BlogPost {
+            id: row.get("id"),
+            slug: row.get("slug"),
+            title: row.get("title"),
+            content: "".to_string(),
+            content_flatbuffer: vec![],
+            content_cached: vec![],
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
         })
-    })?;
-
-    if let Some(row) = rows.next() {
-        Ok(Some(row?))
-    } else {
-        Ok(None)
-    }
+        .collect())
 }
 
-pub fn update_post(
-    conn: &Connection,
-    blog_post: BlogPost,
-    identifier: &str,
-    by_slug: bool,
-) -> Result<()> {
-    let update_post_query = if by_slug {
-        r#"
-        UPDATE posts
-        SET title = ?, content = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE slug = ?
-        "#
-    } else {
-        r#"
-        UPDATE posts
-        SET title = ?, content = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-        "#
+pub async fn get_post_by_id(conn: &DBPool, id: &str) -> Result<Option<BlogPost>, Error> {
+    let qry = r#"
+        SELECT id, slug, title, content, created_at, updated_at
+        FROM posts WHERE id = ?1
+        "#;
+
+    let row = query(qry).bind(id).fetch_optional(&*conn).await?;
+
+    let res = match row {
+        Some(row) => Some(BlogPost::new_with_id(
+            row.get("id"),
+            row.get("slug"),
+            row.get("title"),
+            row.get::<&str, &str>("content"),
+            vec![],
+        )),
+        _ => None,
     };
+    Ok(res)
+}
+
+pub async fn get_post_by_slug(conn: &DBPool, slug: &str) -> Result<Option<BlogPost>, Error> {
+    let qry = r#"
+        SELECT id, slug, title, content_flatbuffer, content_cached, created_at, updated_at
+        FROM posts WHERE slug = ?1
+        "#;
+
+    let row = query(qry).bind(slug).fetch_optional(&*conn).await?;
+
+    let res = match row {
+        Some(row) => Some(BlogPost {
+            id: row.get("id"),
+            slug: row.get("slug"),
+            title: row.get("title"),
+            content: "".to_string(),
+            content_cached: row.get("content_cached"),
+            content_flatbuffer: row.get("content_flatbuffer"),
+            created_at: row.get("created_at"),
+            updated_at: row.get("updated_at"),
+        }),
+        _ => None,
+    };
+    Ok(res)
+}
+
+pub async fn update_post(
+    conn: &DBPool,
+    blog_post: BlogPost,
+    id: &str,
+) -> Result<DBQueryResult, Error> {
+    let update_post_query = r#"
+        UPDATE posts
+        SET title = ?, content = ?, content_flatbuffer = ?, content_cached = ?, slug = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        "#;
 
     let content_str = blog_post.content.to_string();
-    let params: Vec<&dyn rusqlite::ToSql> = if by_slug {
-        vec![
-            &blog_post.title,
-            &content_str,
-            &blog_post.slug,
-            &blog_post.slug,
-        ]
-    } else {
-        vec![&blog_post.title, &content_str, &blog_post.slug, &identifier]
-    };
-    conn.execute(update_post_query, &*params)?;
-    Ok(())
+    query(update_post_query)
+        .bind(blog_post.title)
+        .bind(content_str)
+        .bind(blog_post.content_flatbuffer)
+        .bind(blog_post.content_cached)
+        .bind(blog_post.slug.clone())
+        .bind(id.to_string())
+        .execute(&*conn)
+        .await
 }
 
-pub fn delete_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result<()> {
+pub async fn delete_post(conn: &DBPool, id: &str, by_slug: bool) -> Result<DBQueryResult, Error> {
     let delete_post_query = if by_slug {
         r#"
         DELETE FROM posts WHERE slug = ?
@@ -142,11 +143,11 @@ pub fn delete_post(conn: &Connection, identifier: &str, by_slug: bool) -> Result
         DELETE FROM posts WHERE id = ?
         "#
     };
-    conn.execute(delete_post_query, [identifier])?;
-    Ok(())
+    query(delete_post_query).bind(id).execute(&*conn).await
 }
+/*
 
-pub fn get_stats(conn: &Connection) -> Result<Value> {
+pub fn get_stats(conn: &DBPool) -> Result<Value> {
     let fetch_all_post_query = r#"
         SELECT COUNT(*) AS num_posts
         FROM posts
@@ -160,3 +161,4 @@ pub fn get_stats(conn: &Connection) -> Result<Value> {
         }))
     })
 }
+*/

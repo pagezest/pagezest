@@ -15,4 +15,4 @@ FROM plugins AS admin
 COPY ./pz-admin/ /app/pz-admin
 COPY ./assets/ /app/assets
 
-CMD ["./pagezest"]
+ENTRYPOINT ["./pagezest"]

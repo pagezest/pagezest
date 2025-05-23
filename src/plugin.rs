@@ -1,68 +1,105 @@
 use std::error::Error;
-use wasmi::{Caller, Config, Engine, Func, Linker, Module, Store, TypedFunc, CompilationMode};
+use wasmtime::{Caller, Config, Engine, Instance, Linker, Memory, Module, Store, TypedFunc};
 
-pub fn call_wasm(
-    wasm_file_path: &str,
-    input: &str,
-    plugin_func: &str,
-) -> Result<String, Box<dyn Error>> {
-    let wasm = std::fs::read(wasm_file_path)?;
-
-    // Lazy + unchecked has significant perf benefits over Eager+checked.
-    // https://wasmi-labs.github.io/blog/posts/wasmi-v0.32/
-
-    let mut config = Config::default();
-    config.compilation_mode(CompilationMode::Lazy);
-
-    let engine = Engine::new(&Config::default());
-    let module = unsafe { Module::new_unchecked(&engine, &wasm) }?;
-
-    let mut store = Store::new(&engine, ());
-    let mut linker = Linker::new(&engine);
-    let abort_func = Func::wrap(&mut store, abort_stub);
-    let console_log_func = Func::wrap(&mut store, console_log_stub);
-    linker.define("env", "abort", abort_func)?;
-    linker.define("env", "console.log", console_log_func)?;
-
-    let instance = linker.instantiate(&mut store, &module)?.start(&mut store)?;
-
-    let memory = instance
-        .get_export(&store, "memory")
-        .and_then(|ext| ext.into_memory())
-        .unwrap();
-
-    // Loading greet function and passing input as string and receiving output as string.
-    let plugin_func: TypedFunc<(u32, u32), u32> =
-        instance.get_typed_func(&store, plugin_func)?;
-
-    let input_buffer = input.as_bytes();
-    let offset = 40_000u32;
-    memory
-        .write(&mut store, offset as usize, input_buffer)
-        .unwrap();
-
-    let res_ptr = plugin_func
-        .call(&mut store, (offset, input.len() as u32))
-        .unwrap();
-    let mut output = Vec::new();
-    let mut curr_ptr = res_ptr;
-    loop {
-        let mut buf = [0u8, 1];
-        memory
-            .read(&mut store, curr_ptr as usize, &mut buf)
-            .unwrap();
-        if buf[0] == 0 {
-            break;
-        }
-        output.push(buf[0]);
-        curr_ptr += 1;
-    }
-
-    let output_str = String::from_utf8(output).unwrap();
-    Ok(output_str)
+#[allow(unused)]
+pub struct Plugin {
+    pub name: String,
+    pub tag: String,
+    pub wasm_file_path: String,
+    pub plugin_func_name: String,
+    pub dynamic: bool,
+    instance: Instance,
+    memory: Memory,
+    store: Store<()>,
+    plugin_func: TypedFunc<(u32, u32), u32>,
 }
 
-fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {}
+impl Plugin {
+    pub fn new(
+        name: &str,
+        tag: &str,
+        wasm_path: &str,
+        plugin_func_name: &str,
+        dynamic: bool,
+    ) -> Result<Self, Box<dyn Error>> {
+        let wasm = std::fs::read(wasm_path)?;
+        let mut config = Config::new();
+        config.async_support(false);
+        let engine = Engine::new(&config)?;
+        let module = Module::from_binary(&engine, &wasm)?;
+
+        let mut store = Store::new(&engine, ());
+        let mut linker = Linker::new(&engine);
+
+        linker.func_wrap("env", "abort", abort_stub)?;
+        linker.func_wrap("env", "console.log", console_log_stub)?;
+
+        let instance = linker.instantiate(&mut store, &module)?;
+
+        let memory = instance
+            .get_export(&mut store, "memory")
+            .and_then(|e| e.into_memory())
+            .ok_or("memory export not found")?;
+
+        let plugin_func =
+            instance.get_typed_func::<(u32, u32), u32>(&mut store, plugin_func_name)?;
+
+        Ok(Self {
+            name: name.to_string(),
+            tag: tag.to_string(),
+            wasm_file_path: wasm_path.to_string(),
+            plugin_func_name: plugin_func_name.to_string(),
+            instance,
+            memory,
+            store,
+            plugin_func,
+            dynamic,
+        })
+    }
+
+    pub fn call(&mut self, input: &Vec<u8>) -> Result<String, Box<dyn Error>> {
+        let offset = 40_000u32;
+        self.memory.write(&mut self.store, offset as usize, input)?;
+
+        let res_ptr = self
+            .plugin_func
+            .call(&mut self.store, (offset, input.len() as u32))?;
+
+        let mut output = Vec::new();
+        let mut curr_ptr = res_ptr;
+        loop {
+            let mut buf = [0u8; 1];
+            self.memory
+                .read(&mut self.store, curr_ptr as usize, &mut buf)?;
+            if buf[0] == 0 {
+                break;
+            }
+            output.push(buf[0]);
+            curr_ptr += 1;
+        }
+
+        Ok(String::from_utf8(output)?)
+    }
+}
+
+impl std::fmt::Debug for Plugin {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("Plugin")
+            .field("name", &self.name)
+            .field("tag", &self.tag)
+            .field("wasm_file_path", &self.wasm_file_path)
+            .field("plugin_func_name", &self.plugin_func_name)
+            .finish()
+    }
+}
+
+fn abort_stub(_caller: Caller<'_, ()>, _msg_ptr: i32, _file_ptr: i32, _line: i32, _col: i32) {
+    println!(
+        "abort: msg: {}, file: {}, line: {}, col: {}",
+        _msg_ptr, _file_ptr, _line, _col
+    );
+}
+
 fn console_log_stub(_caller: Caller<'_, ()>, _msg_ptr: i32) {
     println!("console.log called");
 }

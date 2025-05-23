@@ -9,6 +9,8 @@ test_ui() {
   cd $TOP/admin
   npm install
   npm run build
+  rm -rf $TOP/build/pz-admin
+  cp -r dist $TOP/build/pz-admin
 }
 
 test_backend() {
@@ -16,29 +18,33 @@ test_backend() {
   cargo build --release
   cp $TOP/target/release/pagezest $TOP/build/
   cd $TOP/build/
-  rm -rf $TOP/build/pagezest.db
   ./pagezest
 }
 
 # NOTE: for now, this compiles ONLY the toc (table of contents) plugin
 test_plugins() {
-  mkdir -p $TOP/build/plugins/toc
+  mkdir -p $TOP/build/plugins/toc-zig
+  mkdir -p $TOP/build/plugins/toc-rust
   mkdir -p $TOP/build/plugins/footer
+  mkdir -p $TOP/build/plugins/time
 
-  cd $TOP/plugins/toc
-  zig build -p . --prefix-exe-dir .
-  rm -rf $TOP/build/plugins/toc/*
-  cp -r $TOP/plugins/toc/manifest.json $TOP/build/plugins/toc/
-  cp -r $TOP/plugins/toc/toc.wasm $TOP/build/plugins/toc/
+  cd $TOP/plugins/toc-rust
+  cargo build --release --target wasm32-unknown-unknown
+  rm -rf $TOP/build/plugins/toc-rust/*
+  mkdir -p $TOP/build/plugins/toc/
+  cp -r $TOP/plugins/toc-rust/manifest.json $TOP/build/plugins/toc/
+  cp -r $TOP/plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm $TOP/build/plugins/toc/toc.wasm
+
+  cd $TOP/plugins/time
+  cargo build --release --target wasm32-unknown-unknown
+  rm -rf $TOP/build/plugins/time/*
+  cp -r $TOP/plugins/time/manifest.json $TOP/build/plugins/time/
+  cp -r $TOP/plugins/time/target/wasm32-unknown-unknown/release/time.wasm $TOP/build/plugins/time/time.wasm
 
   cd $TOP/plugins/footer
   cargo build --release --target wasm32-unknown-unknown
-  #cargo build --target wasm32-wasip2 --release
-  #wasm-pack build --release --no-typescript --no-pack --reference-types --target web
-  #wasm-pack build --release --no-typescript --no-pack --no-opt --target web
   rm -rf $TOP/build/plugins/footer/*
   cp -r $TOP/plugins/footer/manifest.json $TOP/build/plugins/footer/
-  #cp -r $TOP/plugins/footer/target/wasm32-wasip2/release/footer.wasm $TOP/build/plugins/footer/footer.wasm
   cp -r $TOP/plugins/footer/target/wasm32-unknown-unknown/release/footer.wasm $TOP/build/plugins/footer/footer.wasm
 
   # This last cp is purely if you want to test the wasm in the browser.
