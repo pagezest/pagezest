@@ -36,11 +36,15 @@ cp -r assets/ docker/assets
 
 
 mkdir -p docker/plugins/toc
-cp plugins/toc/*.{wasm,json} docker/plugins/toc
+mkdir -p docker/plugins/toc-dynamic/
+cp ./plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm docker/plugins/toc/toc.wasm
+cp ./plugins/toc-rust/manifest.json docker/plugins/toc/
+cp ./plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm docker/plugins/toc-dynamic/toc.wasm
+cp ./plugins/toc-dynamic/manifest.json docker/plugins/toc-dynamic/
 
 
 docker build -t pagezest/pagezest docker
 
 docker push pagezest/pagezest
-docker image tag pagezest/pagezest pagezest/pagezest:v0.4
+docker image tag pagezest/pagezest pagezest/pagezest:v0.5.1
 docker image push --all-tags pagezest/pagezest

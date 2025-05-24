@@ -8,11 +8,13 @@ pub type DBQueryResult = SqliteQueryResult;
 
 const POSTS_SEED: &str = include_str!("../assets/posts-seed.json");
 
-const POSTS_DATA: [&'static [u8]; 4] = [
+const POSTS_DATA: [&'static [u8]; 6] = [
     include_bytes!("../assets/content_flatbuffer-1.bin"),
     include_bytes!("../assets/content_cached-1.bin"),
     include_bytes!("../assets/content_flatbuffer-2.bin"),
     include_bytes!("../assets/content_cached-2.bin"),
+    include_bytes!("../assets/content_flatbuffer-3.bin"),
+    include_bytes!("../assets/content_cached-3.bin"),
 ];
 
 pub async fn init_db(conn: &DBPool) -> Result<DBQueryResult, Error> {
@@ -159,6 +161,7 @@ pub async fn seed_db(conn: &DBPool) -> Result<(), Error> {
     let res = query("SELECT COUNT(*) AS num_posts FROM posts")
         .fetch_one(&*conn).await?;
     let num_posts: i32 = res.get("num_posts");
+
     if num_posts == 0 {
 
         let posts_data: Vec<BlogPost> = serde_json::from_str(POSTS_SEED).expect("could not parse posts seed file");
