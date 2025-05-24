@@ -25,15 +25,19 @@ test_backend() {
 test_plugins() {
   mkdir -p $TOP/build/plugins/toc-zig
   mkdir -p $TOP/build/plugins/toc-rust
+  mkdir -p $TOP/build/plugins/toc-dynamic
   mkdir -p $TOP/build/plugins/footer
   mkdir -p $TOP/build/plugins/time
 
   cd $TOP/plugins/toc-rust
   cargo build --release --target wasm32-unknown-unknown
   rm -rf $TOP/build/plugins/toc-rust/*
+  rm -rf $TOP/build/plugins/toc-dynamic/*
   mkdir -p $TOP/build/plugins/toc/
   cp -r $TOP/plugins/toc-rust/manifest.json $TOP/build/plugins/toc/
+  cp -r $TOP/plugins/toc-dynamic/manifest.json $TOP/build/plugins/toc-dynamic/
   cp -r $TOP/plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm $TOP/build/plugins/toc/toc.wasm
+  cp -r $TOP/plugins/toc-rust/target/wasm32-unknown-unknown/release/toc.wasm $TOP/build/plugins/toc-dynamic/toc.wasm
 
   cd $TOP/plugins/time
   cargo build --release --target wasm32-unknown-unknown

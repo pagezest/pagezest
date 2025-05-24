@@ -1,0 +1,9 @@
+{
+  "version": "1.0",
+  "name": "toc",
+  "tag": "toc_dynamic",
+  "wasm_path": "toc.wasm",
+  "func_name": "toc",
+  "dynamic": true
+}
+
